@@ -15,18 +15,13 @@ let readings = [
 ];
 
 function checkWebSession() {
-    const session = localStorage.getItem('bviz_web_session');
+    const isAuth = localStorage.getItem('bviz_web_auth');
     const loginScreen = document.getElementById('loginScreen');
     const dashboardContainer = document.getElementById('dashboardContainer');
 
-    if (session) {
+    if (isAuth === 'true') {
         if (loginScreen) loginScreen.style.display = 'none';
         if (dashboardContainer) dashboardContainer.style.display = 'block';
-        const userObj = JSON.parse(session);
-        const userDisplay = document.getElementById('userDisplay');
-        if (userDisplay) {
-            userDisplay.innerHTML = `Bejelentkezve mint: <strong>${userObj.name || 'Mizsei Márk'}</strong>`;
-        }
         initDashboard();
     } else {
         if (loginScreen) loginScreen.style.display = 'flex';
@@ -36,40 +31,24 @@ function checkWebSession() {
 
 function handleWebLogin(event) {
     event.preventDefault();
-    const emailInput = document.getElementById('webEmail').value.trim();
-    const passInput = document.getElementById('webPass').value.trim();
+    const userInput = document.getElementById('webUsername').value.trim();
+    const passInput = document.getElementById('webPassword').value.trim();
     const loginError = document.getElementById('loginError');
 
-    if (!emailInput || !passInput) {
-        if (loginError) {
-            loginError.innerText = "Kérjük, töltsd ki mindkét mezőt!";
-            loginError.style.display = "block";
-        }
-        return;
-    }
-
-    // Determine displayName
-    let displayName = "Mizsei Márk";
-    if (emailInput.toLowerCase().includes("peter") || emailInput.toLowerCase().includes("kovacs")) {
-        displayName = "Kovács Péter";
-    } else if (emailInput.toLowerCase().includes("mizsei") || emailInput.toLowerCase().includes("márk") || emailInput === "asd") {
-        displayName = "Mizsei Márk";
+    if (userInput === 'bviz' && passInput === 'gabicsabibviz') {
+        localStorage.setItem('bviz_web_auth', 'true');
+        if (loginError) loginError.style.display = 'none';
+        checkWebSession();
     } else {
-        displayName = emailInput.split('@')[0];
+        if (loginError) {
+            loginError.innerText = 'Hibás felhasználónév vagy jelszó!';
+            loginError.style.display = 'block';
+        }
     }
-
-    // Save session
-    localStorage.setItem('bviz_web_session', JSON.stringify({
-        email: emailInput,
-        name: displayName
-    }));
-
-    if (loginError) loginError.style.display = "none";
-    checkWebSession();
 }
 
 function handleWebLogout() {
-    localStorage.removeItem('bviz_web_session');
+    localStorage.removeItem('bviz_web_auth');
     checkWebSession();
 }
 

@@ -11,21 +11,21 @@
 </head>
 <body>
 
-    <!-- Web Login Screen -->
+    <!-- Master Web Login Screen -->
     <div id="loginScreen" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: center; border-top: 6px solid #2e7d32;">
             <h1 style="color: #2e7d32; margin-bottom: 6px; font-size: 32px;">💧 Bviz</h1>
             <p style="color: #666; font-size: 14px; margin-bottom: 24px;">Vezetői Irányítópult — Zárt Bejelentkezés</p>
             <form id="loginForm" onsubmit="handleWebLogin(event)">
                 <div style="margin-bottom: 16px; text-align: left;">
-                    <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">E-mail cím / Felhasználónév</label>
-                    <input type="text" id="webEmail" placeholder="E-mail cím" required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                    <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
+                    <input type="text" id="webUsername" placeholder="Felhasználónév" required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div style="margin-bottom: 20px; text-align: left;">
-                    <label style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Jelszó</label>
-                    <input type="password" id="webPass" placeholder="Jelszó" required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                    <label for="webPassword" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Jelszó</label>
+                    <input type="password" id="webPassword" placeholder="Jelszó" required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
-                <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás e-mail cím vagy jelszó!</div>
+                <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás felhasználónév vagy jelszó!</div>
                 <button type="submit" style="width: 100%; background: #2e7d32; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">Bejelentkezés</button>
             </form>
         </div>
@@ -42,7 +42,7 @@
                 <a href="Bviz_app.apk" download style="background: #2e7d32; color: white; padding: 10px 16px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
                     📱 Android App Letöltése (.apk)
                 </a>
-                <span id="userDisplay">Bejelentkezve mint: <strong>Mizsei Márk</strong></span>
+                <span id="userDisplay">Hitelesített Vezetői Hozzáférés: <strong>bviz</strong></span>
                 <button onclick="handleWebLogout()" style="background: #f44336; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">Kijelentkezés</button>
             </div>
         </header>
