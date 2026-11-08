@@ -19,11 +19,11 @@
             <form id="loginForm" onsubmit="handleWebLogin(event)">
                 <div style="margin-bottom: 16px; text-align: left;">
                     <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
-                    <input type="text" id="webUsername" placeholder="Felhasználónév" required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                    <input type="text" id="webUsername" placeholder="Felhasználónév" required autocapitalize="none" autocorrect="off" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div style="margin-bottom: 20px; text-align: left;">
                     <label for="webPassword" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Jelszó</label>
-                    <input type="password" id="webPassword" placeholder="Jelszó" required style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                    <input type="password" id="webPassword" placeholder="Jelszó" required autocapitalize="none" autocorrect="off" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás felhasználónév vagy jelszó!</div>
                 <button type="submit" style="width: 100%; background: #2e7d32; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">Bejelentkezés</button>
@@ -68,7 +68,7 @@
 
         <!-- Data Table -->
         <section class="table-section">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div class="table-header-row">
                 <h2>📋 Telepek Leolvasási Előzményei & Napi Eltérések</h2>
                 <div>
                     <label for="plantFilter"><strong>Város szűrése: </strong></label>
@@ -85,24 +85,26 @@
                     </select>
                 </div>
             </div>
-            <table class="data-table">
-                <thead>
-                    <tr>
-                        <th>Dátum</th>
-                        <th>Város / Telep</th>
-                        <th>Befolyt szennyvíz (m³)</th>
-                        <th>Napi eltérés</th>
-                        <th>Telep áram (kW)</th>
-                        <th>Napi eltérés</th>
-                        <th>Hőmérséklet / Időjárás</th>
-                        <th>Rögzítő neve</th>
-                        <th>Megjegyzés</th>
-                    </tr>
-                </thead>
-                <tbody id="readingsTableBody">
-                    <!-- Loaded dynamically in app.js -->
-                </tbody>
-            </table>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Dátum</th>
+                            <th>Város / Telep</th>
+                            <th>Befolyt szennyvíz (m³)</th>
+                            <th>Napi eltérés</th>
+                            <th>Telep áram (kW)</th>
+                            <th>Napi eltérés</th>
+                            <th>Hőmérséklet / Időjárás</th>
+                            <th>Rögzítő neve</th>
+                            <th>Megjegyzés</th>
+                        </tr>
+                    </thead>
+                    <tbody id="readingsTableBody">
+                        <!-- Loaded dynamically in app.js -->
+                    </tbody>
+                </table>
+            </div>
         </section>
     </div>
 
