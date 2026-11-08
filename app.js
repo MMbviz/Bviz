@@ -14,6 +14,65 @@ let readings = [
     { id: '3', plantName: 'Szabadszállás', dateString: '2026. 11. 08.', coldWaterM3: 89400.0, hotWaterM3: 341200.0, dailyTempC: 13.5, sewageTempC: 17.8, weatherCondition: 'Borús ☁️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' }
 ];
 
+function checkWebSession() {
+    const session = localStorage.getItem('bviz_web_session');
+    const loginScreen = document.getElementById('loginScreen');
+    const dashboardContainer = document.getElementById('dashboardContainer');
+
+    if (session) {
+        if (loginScreen) loginScreen.style.display = 'none';
+        if (dashboardContainer) dashboardContainer.style.display = 'block';
+        const userObj = JSON.parse(session);
+        const userDisplay = document.getElementById('userDisplay');
+        if (userDisplay) {
+            userDisplay.innerHTML = `Bejelentkezve mint: <strong>${userObj.name || 'Mizsei Márk'}</strong>`;
+        }
+        initDashboard();
+    } else {
+        if (loginScreen) loginScreen.style.display = 'flex';
+        if (dashboardContainer) dashboardContainer.style.display = 'none';
+    }
+}
+
+function handleWebLogin(event) {
+    event.preventDefault();
+    const emailInput = document.getElementById('webEmail').value.trim();
+    const passInput = document.getElementById('webPass').value.trim();
+    const loginError = document.getElementById('loginError');
+
+    if (!emailInput || !passInput) {
+        if (loginError) {
+            loginError.innerText = "Kérjük, töltsd ki mindkét mezőt!";
+            loginError.style.display = "block";
+        }
+        return;
+    }
+
+    // Determine displayName
+    let displayName = "Mizsei Márk";
+    if (emailInput.toLowerCase().includes("peter") || emailInput.toLowerCase().includes("kovacs")) {
+        displayName = "Kovács Péter";
+    } else if (emailInput.toLowerCase().includes("mizsei") || emailInput.toLowerCase().includes("márk") || emailInput === "asd") {
+        displayName = "Mizsei Márk";
+    } else {
+        displayName = emailInput.split('@')[0];
+    }
+
+    // Save session
+    localStorage.setItem('bviz_web_session', JSON.stringify({
+        email: emailInput,
+        name: displayName
+    }));
+
+    if (loginError) loginError.style.display = "none";
+    checkWebSession();
+}
+
+function handleWebLogout() {
+    localStorage.removeItem('bviz_web_session');
+    checkWebSession();
+}
+
 function initDashboard() {
     renderTable();
 
@@ -108,4 +167,4 @@ function renderTable() {
     });
 }
 
-document.addEventListener('DOMContentLoaded', initDashboard);
+document.addEventListener('DOMContentLoaded', checkWebSession);
