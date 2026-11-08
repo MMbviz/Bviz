@@ -9,9 +9,9 @@ const firebaseConfig = {
 };
 
 let readings = [
-    { id: '1', plantName: 'Kunszentmiklós', dateString: '2026. 11. 08.', coldWaterM3: 152898.0, hotWaterM3: 6065689.0, dailyTempC: 14.0, sewageTempC: 18.5, weatherCondition: 'Napos ☀️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' },
-    { id: '2', plantName: 'Kunszentmiklós', dateString: '2026. 11. 08.', coldWaterM3: 123.0, hotWaterM3: 456.0, dailyTempC: 10.0, sewageTempC: 30.0, weatherCondition: 'Napos ☀️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' },
-    { id: '3', plantName: 'Szabadszállás', dateString: '2026. 11. 08.', coldWaterM3: 89400.0, hotWaterM3: 341200.0, dailyTempC: 13.5, sewageTempC: 17.8, weatherCondition: 'Borús ☁️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' }
+    { id: '1', plantName: 'Kunszentmiklós', dateString: '2026. 11. 08.', timestamp: 1000, coldWaterM3: 123.0, hotWaterM3: 456.0, dailyTempC: 10.0, sewageTempC: 30.0, weatherCondition: 'Napos ☀️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' },
+    { id: '2', plantName: 'Kunszentmiklós', dateString: '2026. 11. 08.', timestamp: 2000, coldWaterM3: 152898.0, hotWaterM3: 6065689.0, dailyTempC: 14.0, sewageTempC: 18.5, weatherCondition: 'Napos ☀️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' },
+    { id: '3', plantName: 'Szabadszállás', dateString: '2026. 11. 08.', timestamp: 1500, coldWaterM3: 89400.0, hotWaterM3: 341200.0, dailyTempC: 13.5, sewageTempC: 17.8, weatherCondition: 'Borús ☁️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' }
 ];
 
 function checkWebSession() {
@@ -62,7 +62,12 @@ function exportToExcel() {
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
     const filtered = plantFilter === 'ALL' ? readings : readings.filter(r => r.plantName === plantFilter);
 
-    const sortedAsc = [...filtered].sort((a, b) => a.dateString.localeCompare(b.dateString));
+    const sortedAsc = [...filtered].sort((a, b) => {
+        if (a.dateString !== b.dateString) {
+            return a.dateString.localeCompare(b.dateString);
+        }
+        return (a.timestamp || 0) - (b.timestamp || 0);
+    });
     const sortedDesc = [...sortedAsc].reverse();
 
     if (sortedDesc.length === 0) {
@@ -70,7 +75,6 @@ function exportToExcel() {
         return;
     }
 
-    // CSV / Excel Content with UTF-8 BOM (\uFEFF) for Hungarian Accents in MS Excel
     let csvContent = "\uFEFF";
     csvContent += "Dátum;Város / Telep;Befolyt szennyvíz (m3);Befolyt napi eltérés (m3);Telep áramfogyasztás (kW);Áram napi eltérés (kW);Napi hőmérséklet (C);Szennyvíz hőmérséklet (C);Időjárás állapota;Rögzítő neve;Megjegyzés\n";
 
@@ -129,7 +133,6 @@ function initDashboard() {
 
                     let displayName = "";
 
-                    // Clean full name resolution (Vezetéknév + Keresztnév)
                     if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
                         displayName = rawName;
                     } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
@@ -148,6 +151,7 @@ function initDashboard() {
                         id: doc.id,
                         plantName: data.plantName || "Kunszentmiklós",
                         dateString: data.dateString || "",
+                        timestamp: Number(data.timestamp) || 0,
                         coldWaterM3: Number(data.coldWaterM3) || 0,
                         hotWaterM3: Number(data.hotWaterM3) || 0,
                         dailyTempC: Number(data.dailyTempC) || 0,
@@ -179,7 +183,13 @@ function renderTable() {
 
     const filtered = plantFilter === 'ALL' ? readings : readings.filter(r => r.plantName === plantFilter);
 
-    const sortedAsc = [...filtered].sort((a, b) => a.dateString.localeCompare(b.dateString));
+    // Sort chronologically ascending by date and timestamp, then reverse for newest at top
+    const sortedAsc = [...filtered].sort((a, b) => {
+        if (a.dateString !== b.dateString) {
+            return a.dateString.localeCompare(b.dateString);
+        }
+        return (a.timestamp || 0) - (b.timestamp || 0);
+    });
     const sortedDesc = [...sortedAsc].reverse();
 
     if (sortedDesc.length > 0) {
