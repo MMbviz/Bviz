@@ -58,6 +58,59 @@ function handleWebLogout() {
     checkWebSession();
 }
 
+function exportToExcel() {
+    const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
+    const filtered = plantFilter === 'ALL' ? readings : readings.filter(r => r.plantName === plantFilter);
+
+    const sortedAsc = [...filtered].sort((a, b) => a.dateString.localeCompare(b.dateString));
+    const sortedDesc = [...sortedAsc].reverse();
+
+    if (sortedDesc.length === 0) {
+        alert("Nincs letölthető leolvasási adat!");
+        return;
+    }
+
+    // CSV / Excel Content with UTF-8 BOM (\uFEFF) for Hungarian Accents in MS Excel
+    let csvContent = "\uFEFF";
+    csvContent += "Dátum;Város / Telep;Befolyt szennyvíz (m3);Befolyt napi eltérés (m3);Telep áramfogyasztás (kW);Áram napi eltérés (kW);Napi hőmérséklet (C);Szennyvíz hőmérséklet (C);Időjárás állapota;Rögzítő neve;Megjegyzés\n";
+
+    sortedDesc.forEach((item) => {
+        const itemIdx = sortedAsc.findIndex(r => r.id === item.id);
+        const prev = itemIdx > 0 ? sortedAsc[itemIdx - 1] : null;
+
+        const diffCold = prev ? (item.coldWaterM3 - prev.coldWaterM3).toFixed(1) : '0.0';
+        const diffHot = prev ? (item.hotWaterM3 - prev.hotWaterM3).toFixed(1) : '0.0';
+
+        const line = [
+            `"${item.dateString}"`,
+            `"${item.plantName || 'Kunszentmiklós'}"`,
+            `"${item.coldWaterM3.toFixed(1)}"`,
+            `"${diffCold}"`,
+            `"${item.hotWaterM3.toFixed(1)}"`,
+            `"${diffHot}"`,
+            `"${item.dailyTempC || 14.0}"`,
+            `"${item.sewageTempC || 18.0}"`,
+            `"${item.weatherCondition || 'Napos'}"`,
+            `"${item.userName || 'Mizsei Márk'}"`,
+            `"${(item.note || '-').replace(/"/g, '""')}"`
+        ].join(";");
+
+        csvContent += line + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `Bviz_Telepek_Leolvasasok_${plantFilter}_${dateStr}.csv`;
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 function initDashboard() {
     renderTable();
 
