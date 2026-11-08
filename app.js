@@ -15,7 +15,12 @@ let readings = [
 ];
 
 function checkWebSession() {
-    const isAuth = localStorage.getItem('bviz_web_auth');
+    // Clear old localStorage if present to ensure strict gate
+    if (localStorage.getItem('bviz_web_auth')) {
+        localStorage.removeItem('bviz_web_auth');
+    }
+
+    const isAuth = sessionStorage.getItem('bviz_web_auth');
     const loginScreen = document.getElementById('loginScreen');
     const dashboardContainer = document.getElementById('dashboardContainer');
 
@@ -37,10 +42,8 @@ function handleWebLogin(event) {
     const passInput = passElem ? passElem.value.trim() : '';
     const loginError = document.getElementById('loginError');
 
-    if ((userInput === 'bviz' && passInput === 'gabicsabibviz') ||
-        (userInput === 'mizsei92@freemail.hu' || userInput === 'asd') ||
-        (userInput.length > 0 && passInput.length > 0)) {
-        localStorage.setItem('bviz_web_auth', 'true');
+    if (userInput === 'bviz' && passInput === 'gabicsabibviz') {
+        sessionStorage.setItem('bviz_web_auth', 'true');
         if (loginError) loginError.style.display = 'none';
         checkWebSession();
     } else {
@@ -52,6 +55,7 @@ function handleWebLogin(event) {
 }
 
 function handleWebLogout() {
+    sessionStorage.removeItem('bviz_web_auth');
     localStorage.removeItem('bviz_web_auth');
     checkWebSession();
 }
