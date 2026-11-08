@@ -34,16 +34,26 @@
     <!-- Protected Dashboard Container -->
     <div id="dashboardContainer" class="dashboard-container" style="display: none;">
         <header class="top-header">
+            <!-- Left Side Action Buttons (Android App Download & Excel Export) -->
+            <div class="header-left-buttons">
+                <a href="Bviz_app.apk" download class="btn-green">
+                    📱 Android App Letöltése (.apk)
+                </a>
+                <button onclick="exportToExcel()" class="btn-green-dark">
+                    📊 Excel Letöltés (.csv)
+                </button>
+            </div>
+
+            <!-- Center Logo Area -->
             <div class="logo-area">
                 <h1>💧 Bviz</h1>
                 <span class="subtitle">Szennyvíztisztító Telepek Vezetői Irányítópult</span>
             </div>
-            <div class="user-status" style="display: flex; align-items: center; gap: 16px;">
-                <a href="Bviz_app.apk" download style="background: #2e7d32; color: white; padding: 10px 16px; border-radius: 8px; font-weight: bold; text-decoration: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                    📱 Android App Letöltése (.apk)
-                </a>
+
+            <!-- Right User Status & Logout -->
+            <div class="header-right-area">
                 <span id="userDisplay">Hitelesített Vezetői Hozzáférés: <strong>bviz</strong></span>
-                <button onclick="handleWebLogout()" style="background: #f44336; color: white; border: none; padding: 8px 14px; border-radius: 6px; font-weight: bold; cursor: pointer;">Kijelentkezés</button>
+                <button onclick="handleWebLogout()" class="btn-red">Kijelentkezés</button>
             </div>
         </header>
 
@@ -70,24 +80,19 @@
         <section class="table-section">
             <div class="table-header-row">
                 <h2>📋 Telepek Leolvasási Előzményei & Napi Eltérések</h2>
-                <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                    <div>
-                        <label for="plantFilter"><strong>Város szűrése: </strong></label>
-                        <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
-                            <option value="ALL">Minden Város</option>
-                            <option value="Kunszentmiklós">Kunszentmiklós</option>
-                            <option value="Apostag">Apostag</option>
-                            <option value="Dunavecse">Dunavecse</option>
-                            <option value="Szabadszállás">Szabadszállás</option>
-                            <option value="Kunadacs">Kunadacs</option>
-                            <option value="Szalkszentmárton">Szalkszentmárton</option>
-                            <option value="Tass">Tass</option>
-                            <option value="Kunpeszér">Kunpeszér</option>
-                        </select>
-                    </div>
-                    <button onclick="exportToExcel()" style="background: #1b5e20; color: white; border: none; padding: 9px 16px; border-radius: 6px; font-weight: bold; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.12);">
-                        📊 Excel Letöltés (.csv)
-                    </button>
+                <div>
+                    <label for="plantFilter"><strong>Város szűrése: </strong></label>
+                    <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
+                        <option value="ALL">Minden Város</option>
+                        <option value="Kunszentmiklós">Kunszentmiklós</option>
+                        <option value="Apostag">Apostag</option>
+                        <option value="Dunavecse">Dunavecse</option>
+                        <option value="Szabadszállás">Szabadszállás</option>
+                        <option value="Kunadacs">Kunadacs</option>
+                        <option value="Szalkszentmárton">Szalkszentmárton</option>
+                        <option value="Tass">Tass</option>
+                        <option value="Kunpeszér">Kunpeszér</option>
+                    </select>
                 </div>
             </div>
             <div class="table-wrapper">
