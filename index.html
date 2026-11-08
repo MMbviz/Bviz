@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="hu">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bviz - Telepek Vezetői Irányítópult</title>
+    <link rel="stylesheet" href="styles.css">
+    <!-- Firebase Web SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+</head>
+<body>
+    <div class="dashboard-container">
+        <header class="top-header">
+            <div class="logo-area">
+                <h1>💧 Bviz</h1>
+                <span class="subtitle">Szennyvíztisztító Telepek Vezetői Irányítópult</span>
+            </div>
+            <div class="user-status">
+                <span id="userEmail">Bejelentkezve mint: <strong>Mizsei Márk</strong></span>
+                <span class="status-badge online">● Élő Felhő Kapcsolat</span>
+            </div>
+        </header>
+
+        <!-- Summary Cards -->
+        <section class="summary-cards">
+            <div class="card card-blue">
+                <h3>Legutóbbi Befolyt Szennyvíz</h3>
+                <div class="value" id="totalCold">0.0 m³</div>
+                <div class="subtext">Kiválasztott telep állása</div>
+            </div>
+            <div class="card card-orange">
+                <h3>Legutóbbi Áramfogyasztás</h3>
+                <div class="value" id="totalHot">0.0 kW</div>
+                <div class="subtext">Kiválasztott telep állása</div>
+            </div>
+            <div class="card card-purple">
+                <h3>Aktív Városok / Telepek</h3>
+                <div class="value">8 Város</div>
+                <div class="subtext">Kunszentmiklós, Apostag, Dunavecse, Szabadszállás, Kunadacs, Szalkszentmárton, Tass, Kunpeszér</div>
+            </div>
+        </section>
+
+        <!-- Data Table -->
+        <section class="table-section">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2>📋 Telepek Leolvasási Előzményei & Napi Eltérések</h2>
+                <div>
+                    <label for="plantFilter"><strong>Város szűrése: </strong></label>
+                    <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
+                        <option value="ALL">Minden Város</option>
+                        <option value="Kunszentmiklós">Kunszentmiklós</option>
+                        <option value="Apostag">Apostag</option>
+                        <option value="Dunavecse">Dunavecse</option>
+                        <option value="Szabadszállás">Szabadszállás</option>
+                        <option value="Kunadacs">Kunadacs</option>
+                        <option value="Szalkszentmárton">Szalkszentmárton</option>
+                        <option value="Tass">Tass</option>
+                        <option value="Kunpeszér">Kunpeszér</option>
+                    </select>
+                </div>
+            </div>
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Dátum</th>
+                        <th>Város / Telep</th>
+                        <th>Befolyt szennyvíz (m³)</th>
+                        <th>Napi eltérés</th>
+                        <th>Telep áram (kW)</th>
+                        <th>Napi eltérés</th>
+                        <th>Hőmérséklet / Időjárás</th>
+                        <th>Rögzítő neve</th>
+                        <th>Megjegyzés</th>
+                    </tr>
+                </thead>
+                <tbody id="readingsTableBody">
+                    <!-- Loaded dynamically in app.js -->
+                </tbody>
+            </table>
+        </section>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
