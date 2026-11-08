@@ -71,16 +71,24 @@ function initDashboard() {
                 const cloudList = [];
                 snapshot.forEach((doc) => {
                     const data = doc.data();
-                    const rawEmail = data.userEmail || "";
-                    let displayName = data.userName || "";
-                    if (!displayName || displayName === rawEmail) {
-                        if (rawEmail === 'mizsei92@freemail.hu' || rawEmail.includes('mizsei')) {
-                            displayName = 'Mizsei Márk';
-                        } else if (rawEmail === 'peter@bviz.hu') {
-                            displayName = 'Kovács Péter';
-                        } else {
-                            displayName = rawEmail.split('@')[0] || 'Mizsei Márk';
-                        }
+                    const rawEmail = (data.userEmail || "").trim().toLowerCase();
+                    const rawName = (data.userName || "").trim();
+
+                    let displayName = "";
+
+                    // Clean full name resolution (Vezetéknév + Keresztnév)
+                    if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
+                        displayName = rawName;
+                    } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
+                        displayName = "Mizsei Márk";
+                    } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri") || rawName.toLowerCase().includes("ori")) {
+                        displayName = "Őri Csaba";
+                    } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
+                        displayName = "Kovács Péter";
+                    } else if (rawName && !rawName.includes("@") && !rawName.includes("mizse") && !rawName.includes("kiskukac")) {
+                        displayName = rawName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+                    } else {
+                        displayName = "Mizsei Márk";
                     }
 
                     cloudList.push({
