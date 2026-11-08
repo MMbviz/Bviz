@@ -7,6 +7,10 @@
 
 body {
     background-color: #f4f6f9;
+    background-image: linear-gradient(rgba(244, 246, 249, 0.88), rgba(244, 246, 249, 0.88)), url('bviz_bg.webp');
+    background-size: cover;
+    background-position: center;
+    background-attachment: fixed;
     color: #333;
     padding: 24px;
 }
