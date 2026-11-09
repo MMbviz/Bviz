@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bviz - Telepek Vezetői Irányítópult</title>
+    <title>Bviz - Villanyórák Vezetői Irányítópult</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Firebase Web SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -13,9 +13,9 @@
 
     <!-- Master Web Login Screen -->
     <div id="loginScreen" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
-        <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: center; border-top: 6px solid #2e7d32;">
-            <h1 style="color: #2e7d32; margin-bottom: 6px; font-size: 32px;">💧 Bviz</h1>
-            <p style="color: #666; font-size: 14px; margin-bottom: 24px;">Vezetői Irányítópult — Zárt Bejelentkezés</p>
+        <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: center; border-top: 6px solid #1b5e20;">
+            <h1 style="color: #1b5e20; margin-bottom: 6px; font-size: 32px;">⚡ Bviz</h1>
+            <p style="color: #666; font-size: 14px; margin-bottom: 24px;">Villanyórák Vezetői Irányítópult — Zárt Bejelentkezés</p>
             <form id="loginForm" onsubmit="handleWebLogin(event)">
                 <div style="margin-bottom: 16px; text-align: left;">
                     <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
@@ -26,14 +26,14 @@
                     <input type="password" id="webPassword" placeholder="Jelszó" required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás felhasználónév vagy jelszó!</div>
-                <button type="submit" style="width: 100%; background: #2e7d32; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">Bejelentkezés</button>
+                <button type="submit" style="width: 100%; background: #1b5e20; color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;">Bejelentkezés</button>
             </form>
         </div>
     </div>
 
     <!-- Protected Dashboard Container -->
     <div id="dashboardContainer" class="dashboard-container" style="display: none;">
-        <header class="top-header">
+        <header class="top-header" style="background: linear-gradient(135deg, #1b5e20, #2e7d32);">
             <!-- Left Side Action Buttons (Android App Download & Excel Export) -->
             <div class="header-left-buttons">
                 <a href="Bviz_app.apk" download class="btn-green">
@@ -46,8 +46,8 @@
 
             <!-- Center Logo Area -->
             <div class="logo-area">
-                <h1>💧 Bviz</h1>
-                <span class="subtitle">Szennyvíztisztító Telepek Vezetői Irányítópult</span>
+                <h1>⚡ Bviz</h1>
+                <span class="subtitle">Villanyórák & Utcai Vezérlőszekrények Vezetői Irányítópult</span>
             </div>
 
             <!-- Right User Status & Logout -->
@@ -59,31 +59,32 @@
 
         <!-- Summary Cards -->
         <section class="summary-cards">
-            <div class="card card-blue">
-                <h3>Legutóbbi Befolyt Szennyvíz</h3>
-                <div class="value" id="totalCold">0.0 m³</div>
-                <div class="subtext">Kiválasztott telep állása</div>
+            <div class="card card-green" style="border-left: 5px solid #1b5e20;">
+                <h3>Összes Villanyóra Leolvasás</h3>
+                <div class="value" id="totalReadingsCount">0 db</div>
+                <div class="subtext">A rendszerben rögzített leolvasások</div>
             </div>
-            <div class="card card-orange">
-                <h3>Legutóbbi Áramfogyasztás</h3>
-                <div class="value" id="totalHot">0.0 kW</div>
-                <div class="subtext">Kiválasztott telep állása</div>
+            <div class="card card-orange" style="border-left: 5px solid #f57c00;">
+                <h3>Legutóbbi Rögzítő</h3>
+                <div class="value" id="latestUploader">Mizsei Márk</div>
+                <div class="subtext" id="latestDate">Legutóbbi rögzítés dátuma</div>
             </div>
-            <div class="card card-purple">
-                <h3>Aktív Városok / Telepek</h3>
-                <div class="value">8 Város</div>
-                <div class="subtext">Kunszentmiklós, Apostag, Dunavecse, Szabadszállás, Kunadacs, Szalkszentmárton, Tass, Kunpeszér</div>
+            <div class="card card-purple" style="border-left: 5px solid #6a1b9a;">
+                <h3>Kezelt Települések (9 Város)</h3>
+                <div class="value" style="font-size: 18px; color: #1b5e20;">Apaj, Kunszentmiklós, Apostag, Dunavecse...</div>
+                <div class="subtext">Utcaszintű vezérlőszekrény nyilvántartás</div>
             </div>
         </section>
 
         <!-- Data Table -->
         <section class="table-section">
             <div class="table-header-row">
-                <h2>📋 Telepek Leolvasási Előzményei & Napi Eltérések</h2>
+                <h2>⚡ Villanyórák Leolvasási Előzményei & Utcaszintű Fogyasztás</h2>
                 <div>
                     <label for="plantFilter"><strong>Város szűrése: </strong></label>
-                    <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc;">
+                    <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold;">
                         <option value="ALL">Minden Város</option>
+                        <option value="Apaj">Apaj</option>
                         <option value="Kunszentmiklós">Kunszentmiklós</option>
                         <option value="Apostag">Apostag</option>
                         <option value="Dunavecse">Dunavecse</option>
@@ -99,15 +100,14 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Dátum</th>
-                            <th>Város / Telep</th>
-                            <th>Befolyt szennyvíz (m³)</th>
-                            <th>Napi eltérés</th>
-                            <th>Telep áram (kW)</th>
-                            <th>Napi eltérés</th>
-                            <th>Hőmérséklet / Időjárás</th>
-                            <th>Rögzítő neve</th>
+                            <th>Leolvasás Dátuma</th>
+                            <th>Város / Település</th>
+                            <th>Utca / Vezérlőszekrény</th>
+                            <th>Leolvasott Óraállás (kWh)</th>
+                            <th>Fogyasztási Különbség (kWh)</th>
+                            <th>Rögzítő Neve</th>
                             <th>Megjegyzés</th>
+                            <th>Műveletek</th>
                         </tr>
                     </thead>
                     <tbody id="readingsTableBody">
@@ -116,6 +116,38 @@
                 </table>
             </div>
         </section>
+    </div>
+
+    <!-- Edit Reading Modal -->
+    <div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #1b5e20;">
+            <h2 style="color: #1b5e20; margin-bottom: 16px; font-size: 20px;">✏️ Leolvasás Szerkesztése</h2>
+            <input type="hidden" id="editReadingId">
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Város / Település</label>
+                <input type="text" id="editSettlement" readonly style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Utca / Vezérlőszekrény</label>
+                <input type="text" id="editMeterName" readonly style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Leolvasott Óraállás (kWh)</label>
+                <input type="number" id="editDayKwh" step="1" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #1565c0; font-size: 16px; font-weight: bold; color: #1565c0; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Leolvasás Dátuma</label>
+                <input type="text" id="editDateString" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Rögzítő Neve</label>
+                <input type="text" id="editUserName" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeEditModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveEditFromWeb()" style="background: #1b5e20; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés</button>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

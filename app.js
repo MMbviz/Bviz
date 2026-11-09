@@ -8,10 +8,10 @@ const firebaseConfig = {
     appId: "1:1076211077079:web:bviz"
 };
 
-let readings = [
-    { id: '1', plantName: 'Kunszentmiklós', dateString: '2026. 11. 08.', timestamp: 1000, coldWaterM3: 123.0, hotWaterM3: 456.0, dailyTempC: 10.0, sewageTempC: 30.0, weatherCondition: 'Napos ☀️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' },
-    { id: '2', plantName: 'Kunszentmiklós', dateString: '2026. 11. 08.', timestamp: 2000, coldWaterM3: 152898.0, hotWaterM3: 6065689.0, dailyTempC: 14.0, sewageTempC: 18.5, weatherCondition: 'Napos ☀️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' },
-    { id: '3', plantName: 'Szabadszállás', dateString: '2026. 11. 08.', timestamp: 1500, coldWaterM3: 89400.0, hotWaterM3: 341200.0, dailyTempC: 13.5, sewageTempC: 17.8, weatherCondition: 'Borús ☁️', userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: 'Napi leolvasás' }
+let electricityReadings = [
+    { id: '1', settlementName: 'Apaj', meterName: 'I. számú Dobó I. u. vezérlőszekrény', dayKwh: 9085, dateString: '2026. 11. 08.', timestamp: 1000, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
+    { id: '2', settlementName: 'Apaj', meterName: 'II. számú Dobó I. u. vezérlőszekrény', dayKwh: 46184, dateString: '2026. 11. 08.', timestamp: 1001, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
+    { id: '3', settlementName: 'Apaj', meterName: 'III. számú Tópart u. vezérlőszekrény', dayKwh: 5761, dateString: '2026. 11. 08.', timestamp: 1002, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' }
 ];
 
 function checkWebSession() {
@@ -58,9 +58,84 @@ function handleWebLogout() {
     checkWebSession();
 }
 
+function openEditModal(docId) {
+    const item = electricityReadings.find(r => r.id === docId);
+    if (!item) return;
+
+    document.getElementById('editReadingId').value = item.id;
+    document.getElementById('editSettlement').value = item.settlementName || 'Apaj';
+    document.getElementById('editMeterName').value = item.meterName || 'Vezérlőszekrény';
+    document.getElementById('editDayKwh').value = item.dayKwh || 0;
+    document.getElementById('editDateString').value = item.dateString || '';
+    document.getElementById('editUserName').value = item.userName || 'Mizsei Márk';
+
+    const modal = document.getElementById('editModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeEditModal() {
+    const modal = document.getElementById('editModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveEditFromWeb() {
+    const docId = document.getElementById('editReadingId').value;
+    const dayKwh = Number(document.getElementById('editDayKwh').value);
+    const dateString = document.getElementById('editDateString').value.trim();
+    const userName = document.getElementById('editUserName').value.trim();
+
+    if (isNaN(dayKwh) || dayKwh < 0) {
+        alert("Kérjük adj meg egy érvényes óraállást!");
+        return;
+    }
+
+    const idx = electricityReadings.findIndex(r => r.id === docId);
+    if (idx >= 0) {
+        electricityReadings[idx].dayKwh = dayKwh;
+        electricityReadings[idx].dateString = dateString;
+        electricityReadings[idx].userName = userName;
+        renderTable();
+    }
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("electricity_readings").doc(docId).update({
+                dayKwh: dayKwh,
+                dateString: dateString,
+                userName: userName
+            })
+            .then(() => console.log("Sikeresen frissítve a Firestore-ban:", docId))
+            .catch(e => console.error("Hiba a Firestore frissítésnél:", e));
+        } catch (e) {
+            console.error("Firebase update error:", e);
+        }
+    }
+
+    closeEditModal();
+}
+
+function deleteReadingFromWeb(docId) {
+    if (confirm("Biztosan törölni szeretnéd ezt a villanyóra leolvasási adatot?")) {
+        electricityReadings = electricityReadings.filter(r => r.id !== docId);
+        renderTable();
+
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                db.collection("electricity_readings").doc(docId).delete()
+                    .then(() => console.log("Sikeresen törölve a Firestore-ból:", docId))
+                    .catch(e => console.error("Hiba a Firestore törlésnél:", e));
+            } catch (e) {
+                console.error("Firebase hiba:", e);
+            }
+        }
+    }
+}
+
 function exportToExcel() {
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
-    const filtered = plantFilter === 'ALL' ? readings : readings.filter(r => r.plantName === plantFilter);
+    const filtered = plantFilter === 'ALL' ? electricityReadings : electricityReadings.filter(r => r.settlementName === plantFilter);
 
     const sortedAsc = [...filtered].sort((a, b) => {
         if (a.dateString !== b.dateString) {
@@ -71,30 +146,27 @@ function exportToExcel() {
     const sortedDesc = [...sortedAsc].reverse();
 
     if (sortedDesc.length === 0) {
-        alert("Nincs letölthető leolvasási adat!");
+        alert("Nincs letölthető villanyóra leolvasási adat!");
         return;
     }
 
     let csvContent = "\uFEFF";
-    csvContent += "Dátum;Város / Telep;Befolyt szennyvíz (m3);Befolyt napi eltérés (m3);Telep áramfogyasztás (kW);Áram napi eltérés (kW);Napi hőmérséklet (C);Szennyvíz hőmérséklet (C);Időjárás állapota;Rögzítő neve;Megjegyzés\n";
+    csvContent += "Leolvasás Dátuma;Város / Település;Utca / Vezérlőszekrény;Óraállás (kWh);Fogyasztási Különbség (kWh);Rögzítő Neve;Megjegyzés\n";
 
     sortedDesc.forEach((item) => {
-        const itemIdx = sortedAsc.findIndex(r => r.id === item.id);
-        const prev = itemIdx > 0 ? sortedAsc[itemIdx - 1] : null;
+        const sameMeterReadings = sortedAsc.filter(r => r.settlementName === item.settlementName && r.meterName === item.meterName);
+        const itemIdx = sameMeterReadings.findIndex(r => r.id === item.id);
+        const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
 
-        const diffCold = prev ? (item.coldWaterM3 - prev.coldWaterM3).toFixed(1) : '0.0';
-        const diffHot = prev ? (item.hotWaterM3 - prev.hotWaterM3).toFixed(1) : '0.0';
+        const diffKwh = prev ? (item.dayKwh - prev.dayKwh) : null;
+        const diffText = diffKwh !== null ? (diffKwh >= 0 ? '+' + diffKwh.toFixed(0) : diffKwh.toFixed(0)) : '0';
 
         const line = [
             `"${item.dateString}"`,
-            `"${item.plantName || 'Kunszentmiklós'}"`,
-            `"${item.coldWaterM3.toFixed(1)}"`,
-            `"${diffCold}"`,
-            `"${item.hotWaterM3.toFixed(1)}"`,
-            `"${diffHot}"`,
-            `"${item.dailyTempC || 14.0}"`,
-            `"${item.sewageTempC || 18.0}"`,
-            `"${item.weatherCondition || 'Napos'}"`,
+            `"${item.settlementName || 'Apaj'}"`,
+            `"${item.meterName || 'Vezérlőszekrény'}"`,
+            `"${item.dayKwh}"`,
+            `"${diffText}"`,
             `"${item.userName || 'Mizsei Márk'}"`,
             `"${(item.note || '-').replace(/"/g, '""')}"`
         ].join(";");
@@ -106,7 +178,7 @@ function exportToExcel() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `Bviz_Telepek_Leolvasasok_${plantFilter}_${dateStr}.csv`;
+    const fileName = `Bviz_Villanyorak_Leolvasasok_${plantFilter}_${dateStr}.csv`;
 
     link.setAttribute("href", url);
     link.setAttribute("download", fileName);
@@ -124,11 +196,11 @@ function initDashboard() {
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
 
-            db.collection("readings").onSnapshot((snapshot) => {
+            db.collection("electricity_readings").onSnapshot((snapshot) => {
                 const cloudList = [];
                 snapshot.forEach((doc) => {
                     const data = doc.data();
-                    const rawEmail = (data.userEmail || "").trim().toLowerCase();
+                    const rawEmail = (data.userEmail || "").trim().lowercase();
                     const rawName = (data.userName || "").trim();
 
                     let displayName = "";
@@ -149,25 +221,22 @@ function initDashboard() {
 
                     cloudList.push({
                         id: doc.id,
-                        plantName: data.plantName || "Kunszentmiklós",
+                        settlementName: data.settlementName || "Apaj",
+                        meterName: data.meterName || "I. számú Dobó I. u.",
                         dateString: data.dateString || "",
                         timestamp: Number(data.timestamp) || 0,
-                        coldWaterM3: Number(data.coldWaterM3) || 0,
-                        hotWaterM3: Number(data.hotWaterM3) || 0,
-                        dailyTempC: Number(data.dailyTempC) || 0,
-                        sewageTempC: Number(data.sewageTempC) || 0,
-                        weatherCondition: data.weatherCondition || "",
+                        dayKwh: Number(data.dayKwh) || 0,
                         userEmail: rawEmail,
                         userName: displayName,
                         note: data.note || ""
                     });
                 });
                 if (cloudList.length > 0) {
-                    readings = cloudList;
+                    electricityReadings = cloudList;
                     renderTable();
                 }
             }, (error) => {
-                console.warn("Firestore snapshot warning:", error);
+                console.warn("Firestore electricity_readings snapshot warning:", error);
             });
         } catch (e) {
             console.warn("Firebase initialization warning:", e);
@@ -181,7 +250,7 @@ function renderTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const filtered = plantFilter === 'ALL' ? readings : readings.filter(r => r.plantName === plantFilter);
+    const filtered = plantFilter === 'ALL' ? electricityReadings : electricityReadings.filter(r => r.settlementName === plantFilter);
 
     // Sort chronologically ascending by date and timestamp, then reverse for newest at top
     const sortedAsc = [...filtered].sort((a, b) => {
@@ -192,32 +261,44 @@ function renderTable() {
     });
     const sortedDesc = [...sortedAsc].reverse();
 
+    const countElem = document.getElementById('totalReadingsCount');
+    const uploaderElem = document.getElementById('latestUploader');
+    const dateElem = document.getElementById('latestDate');
+
+    if (countElem) countElem.innerText = `${filtered.length} db`;
+
     if (sortedDesc.length > 0) {
         const latest = sortedDesc[0];
-        const totalColdElem = document.getElementById('totalCold');
-        const totalHotElem = document.getElementById('totalHot');
-        if (totalColdElem) totalColdElem.innerText = `${latest.coldWaterM3.toFixed(1)} m³`;
-        if (totalHotElem) totalHotElem.innerText = `${latest.hotWaterM3.toFixed(1)} kW`;
+        if (uploaderElem) uploaderElem.innerText = latest.userName || 'Mizsei Márk';
+        if (dateElem) dateElem.innerText = `Legutóbbi: ${latest.dateString || ''}`;
     }
 
     sortedDesc.forEach((item) => {
-        const itemIdx = sortedAsc.findIndex(r => r.id === item.id);
-        const prev = itemIdx > 0 ? sortedAsc[itemIdx - 1] : null;
+        const sameMeterReadings = sortedAsc.filter(r => r.settlementName === item.settlementName && r.meterName === item.meterName);
+        const itemIdx = sameMeterReadings.findIndex(r => r.id === item.id);
+        const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
 
-        const diffCold = prev ? (item.coldWaterM3 - prev.coldWaterM3).toFixed(1) : '-';
-        const diffHot = prev ? (item.hotWaterM3 - prev.hotWaterM3).toFixed(1) : '-';
+        const diffKwh = prev ? (item.dayKwh - prev.dayKwh) : null;
+        const diffText = diffKwh !== null ? (diffKwh >= 0 ? '+' + diffKwh.toFixed(0) + ' kWh' : diffKwh.toFixed(0) + ' kWh') : '-';
+        const isPos = diffKwh === null || diffKwh >= 0;
 
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><strong>${item.dateString}</strong></td>
-            <td><span style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #2e7d32;">${item.plantName || 'Kunszentmiklós'}</span></td>
-            <td>${item.coldWaterM3.toFixed(1)} m³</td>
-            <td class="${diffCold !== '-' && diffCold >= 0 ? 'badge-plus' : ''}">${diffCold !== '-' ? '+' + diffCold + ' m³' : '-'}</td>
-            <td>${item.hotWaterM3.toFixed(1)} kW</td>
-            <td class="${diffHot !== '-' && diffHot >= 0 ? 'badge-plus' : ''}">${diffHot !== '-' ? '+' + diffHot + ' kW' : '-'}</td>
-            <td>${item.weatherCondition || ''} | Napi: ${item.dailyTempC || 14}°C / Szennyvíz: ${item.sewageTempC || 18}°C</td>
+            <td><span style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1b5e20;">⚡ ${item.settlementName || 'Apaj'}</span></td>
+            <td><strong>${item.meterName || 'Vezérlőszekrény'}</strong></td>
+            <td style="font-size: 15px; font-weight: bold; color: #1565c0;">${item.dayKwh} kWh</td>
+            <td><span style="background: ${isPos ? '#fff3e0' : '#ffebee'}; color: ${isPos ? '#e65100' : '#c62828'}; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${diffText}</span></td>
             <td><strong style="color: #1b5e20;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>
             <td>${item.note || '-'}</td>
+            <td style="text-align: center; white-space: nowrap;">
+                <button onclick="openEditModal('${item.id}')" style="background: #e3f2fd; border: 1px solid #64b5f6; color: #1565c0; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-right: 4px;" title="Szerkesztés">
+                    ✏️ Szerkesztés
+                </button>
+                <button onclick="deleteReadingFromWeb('${item.id}')" style="background: #ffebee; border: 1px solid #ef5350; color: #c62828; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;" title="Adat törlése">
+                    🗑 Törlés
+                </button>
+            </td>
         `;
         tbody.appendChild(row);
     });
