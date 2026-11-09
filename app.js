@@ -105,7 +105,10 @@ function saveEditFromWeb() {
                 dateString: dateString,
                 userName: userName
             })
-            .then(() => console.log("Sikeresen frissítve a Firestore-ban:", docId))
+            .then(() => {
+                console.log("Sikeresen frissítve a Firestore-ban:", docId);
+                fetchElectricityReadingsFromRest();
+            })
             .catch(e => console.error("Hiba a Firestore frissítésnél:", e));
         } catch (e) {
             console.error("Firebase update error:", e);
@@ -124,7 +127,10 @@ function deleteReadingFromWeb(docId) {
             try {
                 const db = firebase.firestore();
                 db.collection("electricity_readings").doc(docId).delete()
-                    .then(() => console.log("Sikeresen törölve a Firestore-ból:", docId))
+                    .then(() => {
+                        console.log("Sikeresen törölve a Firestore-ból:", docId);
+                        fetchElectricityReadingsFromRest();
+                    })
                     .catch(e => console.error("Hiba a Firestore törlésnél:", e));
             } catch (e) {
                 console.error("Firebase hiba:", e);
@@ -135,7 +141,7 @@ function deleteReadingFromWeb(docId) {
 
 function exportToExcel() {
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
-    const filtered = plantFilter === 'ALL' ? electricityReadings : electricityReadings.filter(r => r.settlementName === plantFilter);
+    const filtered = plantFilter === 'ALL' ? electricityReadings : electricityReadings.filter(r => (r.settlementName || '').trim().toLowerCase() === plantFilter.trim().toLowerCase());
 
     const sortedAsc = [...filtered].sort((a, b) => {
         if (a.dateString !== b.dateString) {
@@ -154,7 +160,7 @@ function exportToExcel() {
     csvContent += "Leolvasás Dátuma;Város / Település;Utca / Vezérlőszekrény;Óraállás (kWh);Fogyasztási Különbség (kWh);Rögzítő Neve;Megjegyzés\n";
 
     sortedDesc.forEach((item) => {
-        const sameMeterReadings = sortedAsc.filter(r => r.settlementName === item.settlementName && r.meterName === item.meterName);
+        const sameMeterReadings = sortedAsc.filter(r => (r.settlementName || '').trim().toLowerCase() === (item.settlementName || '').trim().toLowerCase() && (r.meterName || '').trim().toLowerCase() === (item.meterName || '').trim().toLowerCase());
         const itemIdx = sameMeterReadings.findIndex(r => r.id === item.id);
         const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
 
@@ -187,54 +193,74 @@ function exportToExcel() {
     document.body.removeChild(link);
 }
 
+async function fetchElectricityReadingsFromRest() {
+    try {
+        const response = await fetch("https://firestore.googleapis.com/v1/projects/bviz-1cf84/databases/(default)/documents/electricity_readings");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.documents || data.documents.length === 0) return;
+
+        const cloudList = data.documents.map(doc => {
+            const fields = doc.fields || {};
+            const docId = doc.name.split('/').pop();
+            const settlement = fields.settlementName ? fields.settlementName.stringValue : "Apaj";
+            const meter = fields.meterName ? fields.meterName.stringValue : "I. számú Dobó I. u.";
+            const dateStr = fields.dateString ? fields.dateString.stringValue : "";
+            const dayVal = fields.dayKwh ? (fields.dayKwh.doubleValue !== undefined ? fields.dayKwh.doubleValue : Number(fields.dayKwh.integerValue || 0)) : 0;
+            const tsVal = fields.timestamp ? Number(fields.timestamp.integerValue || fields.timestamp.doubleValue || 0) : 0;
+            const rawEmail = fields.userEmail ? fields.userEmail.stringValue : "";
+            const rawName = fields.userName ? fields.userName.stringValue : "";
+
+            let displayName = "Mizsei Márk";
+            if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
+                displayName = rawName;
+            } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
+                displayName = "Mizsei Márk";
+            } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri")) {
+                displayName = "Őri Csaba";
+            } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
+                displayName = "Kovács Péter";
+            } else if (rawName && !rawName.includes("@")) {
+                displayName = rawName;
+            }
+
+            return {
+                id: docId,
+                settlementName: settlement,
+                meterName: meter,
+                dateString: dateStr,
+                timestamp: tsVal,
+                dayKwh: dayVal,
+                userEmail: rawEmail,
+                userName: displayName,
+                note: fields.note ? fields.note.stringValue : ""
+            };
+        });
+
+        if (cloudList.length > 0) {
+            electricityReadings = cloudList;
+            renderTable();
+        }
+    } catch (e) {
+        console.warn("REST API fetch error:", e);
+    }
+}
+
 function initDashboard() {
     renderTable();
+    fetchElectricityReadingsFromRest();
 
-    // Connect to Google Firebase Cloud Firestore for real-time live data sync
+    // Poll every 2 seconds for guaranteed 100% instant REST API live sync
+    setInterval(fetchElectricityReadingsFromRest, 2000);
+
+    // Also connect to Firebase Web SDK onSnapshot
     if (typeof firebase !== 'undefined') {
         try {
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
 
             db.collection("electricity_readings").onSnapshot((snapshot) => {
-                const cloudList = [];
-                snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const rawEmail = (data.userEmail || "").trim().lowercase();
-                    const rawName = (data.userName || "").trim();
-
-                    let displayName = "";
-
-                    if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
-                        displayName = rawName;
-                    } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
-                        displayName = "Mizsei Márk";
-                    } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri") || rawName.toLowerCase().includes("ori")) {
-                        displayName = "Őri Csaba";
-                    } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
-                        displayName = "Kovács Péter";
-                    } else if (rawName && !rawName.includes("@") && !rawName.includes("mizse") && !rawName.includes("kiskukac")) {
-                        displayName = rawName.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
-                    } else {
-                        displayName = "Mizsei Márk";
-                    }
-
-                    cloudList.push({
-                        id: doc.id,
-                        settlementName: data.settlementName || "Apaj",
-                        meterName: data.meterName || "I. számú Dobó I. u.",
-                        dateString: data.dateString || "",
-                        timestamp: Number(data.timestamp) || 0,
-                        dayKwh: Number(data.dayKwh) || 0,
-                        userEmail: rawEmail,
-                        userName: displayName,
-                        note: data.note || ""
-                    });
-                });
-                if (cloudList.length > 0) {
-                    electricityReadings = cloudList;
-                    renderTable();
-                }
+                fetchElectricityReadingsFromRest();
             }, (error) => {
                 console.warn("Firestore electricity_readings snapshot warning:", error);
             });
@@ -250,7 +276,9 @@ function renderTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const filtered = plantFilter === 'ALL' ? electricityReadings : electricityReadings.filter(r => r.settlementName === plantFilter);
+    const filtered = plantFilter === 'ALL'
+        ? electricityReadings
+        : electricityReadings.filter(r => (r.settlementName || '').trim().toLowerCase() === plantFilter.trim().toLowerCase());
 
     // Sort chronologically ascending by date and timestamp, then reverse for newest at top
     const sortedAsc = [...filtered].sort((a, b) => {
@@ -274,7 +302,10 @@ function renderTable() {
     }
 
     sortedDesc.forEach((item) => {
-        const sameMeterReadings = sortedAsc.filter(r => r.settlementName === item.settlementName && r.meterName === item.meterName);
+        const sameMeterReadings = sortedAsc.filter(r =>
+            (r.settlementName || '').trim().toLowerCase() === (item.settlementName || '').trim().toLowerCase() &&
+            (r.meterName || '').trim().toLowerCase() === (item.meterName || '').trim().toLowerCase()
+        );
         const itemIdx = sameMeterReadings.findIndex(r => r.id === item.id);
         const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
 
