@@ -8,12 +8,7 @@ const firebaseConfig = {
     appId: "1:1076211077079:web:bviz"
 };
 
-let electricityReadings = [
-    { id: '1', settlementName: 'Apaj', meterName: 'I. számú Dobó I. u.', dayKwh: 9085, dateString: '2026. 11. 08.', timestamp: 1000, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
-    { id: '2', settlementName: 'Apaj', meterName: 'II. számú Dobó I. u.', dayKwh: 46184, dateString: '2026. 11. 08.', timestamp: 1001, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
-    { id: '3', settlementName: 'Apaj', meterName: 'III. számú Tópart u.', dayKwh: 5761, dateString: '2026. 11. 08.', timestamp: 1002, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' }
-];
-
+let electricityReadings = [];
 let cleaningRecords = [];
 
 function checkWebSession() {
@@ -71,13 +66,13 @@ function switchWebTab(tabName) {
         if (tabClean) tabClean.classList.add('active');
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'block';
-        fetchCleaningRecordsFromRest();
+        renderCleaningTable();
     } else {
         if (tabElec) tabElec.classList.add('active');
         if (tabClean) tabClean.classList.remove('active');
         if (secElec) secElec.style.display = 'block';
         if (secClean) secClean.style.display = 'none';
-        fetchElectricityReadingsFromRest();
+        renderTable();
     }
 }
 
@@ -128,10 +123,7 @@ function saveEditFromWeb() {
                 dateString: dateString,
                 userName: userName
             })
-            .then(() => {
-                console.log("Sikeresen frissítve a Firestore-ban:", docId);
-                fetchElectricityReadingsFromRest();
-            })
+            .then(() => console.log("Sikeresen frissítve a Firestore-ban:", docId))
             .catch(e => console.error("Hiba a Firestore frissítésnél:", e));
         } catch (e) {
             console.error("Firebase update error:", e);
@@ -150,10 +142,7 @@ function deleteReadingFromWeb(docId) {
             try {
                 const db = firebase.firestore();
                 db.collection("electricity_readings").doc(docId).delete()
-                    .then(() => {
-                        console.log("Sikeresen törölve a Firestore-ból:", docId);
-                        fetchElectricityReadingsFromRest();
-                    })
+                    .then(() => console.log("Sikeresen törölve a Firestore-ból:", docId))
                     .catch(e => console.error("Hiba a Firestore törlésnél:", e));
             } catch (e) {
                 console.error("Firebase hiba:", e);
@@ -327,6 +316,13 @@ function renderCleaningTable() {
 
     const sortedDesc = [...cleaningRecords].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
+    if (sortedDesc.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td colspan="6" style="text-align: center; color: #666; padding: 24px; font-size: 14px;">Még nincs rögzített takarítási adat. Hozz létre egyet az applikáció 🚛 Takarítás fülén!</td>`;
+        tbody.appendChild(row);
+        return;
+    }
+
     sortedDesc.forEach((item) => {
         const row = document.createElement('tr');
         row.innerHTML = `
@@ -356,7 +352,6 @@ function deleteCleaningRecordFromWeb(docId) {
                 db.collection("cleaning_records").doc(docId).delete()
                     .then(() => {
                         console.log("Sikeresen törölve a Firestore-ból:", docId);
-                        fetchCleaningRecordsFromRest();
                     })
                     .catch(e => console.error("Hiba a Firestore törlésnél:", e));
             } catch (e) {
@@ -405,31 +400,98 @@ function exportCleaningToExcel() {
 function initDashboard() {
     renderTable();
     renderCleaningTable();
-    fetchElectricityReadingsFromRest();
-    fetchCleaningRecordsFromRest();
 
-    // Poll every 2 seconds for guaranteed 100% instant REST API live sync
-    setInterval(() => {
-        fetchElectricityReadingsFromRest();
-        fetchCleaningRecordsFromRest();
-    }, 2000);
-
-    // Also connect to Firebase Web SDK onSnapshot
+    // Connect to Firebase Web SDK onSnapshot for real-time live WebSockets updates
     if (typeof firebase !== 'undefined') {
         try {
             firebase.initializeApp(firebaseConfig);
             const db = firebase.firestore();
 
             db.collection("electricity_readings").onSnapshot((snapshot) => {
+                const list = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const rawEmail = (data.userEmail || "").trim().toLowerCase();
+                    const rawName = (data.userName || "").trim();
+
+                    let displayName = "Mizsei Márk";
+                    if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
+                        displayName = rawName;
+                    } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
+                        displayName = "Mizsei Márk";
+                    } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri")) {
+                        displayName = "Őri Csaba";
+                    } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
+                        displayName = "Kovács Péter";
+                    } else if (rawName && !rawName.includes("@")) {
+                        displayName = rawName;
+                    }
+
+                    list.push({
+                        id: doc.id,
+                        settlementName: data.settlementName || "Apaj",
+                        meterName: data.meterName || "Helyszín",
+                        dateString: data.dateString || "",
+                        timestamp: Number(data.timestamp) || 0,
+                        dayKwh: Number(data.dayKwh) || 0,
+                        userEmail: rawEmail,
+                        userName: displayName,
+                        note: data.note || ""
+                    });
+                });
+                electricityReadings = list;
+                renderTable();
+            }, (error) => {
+                console.warn("Firestore electricity_readings snapshot error:", error);
                 fetchElectricityReadingsFromRest();
             });
 
             db.collection("cleaning_records").onSnapshot((snapshot) => {
+                const list = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const rawEmail = (data.userEmail || "").trim().toLowerCase();
+                    const rawName = (data.userName || "").trim();
+
+                    let displayName = "Mizsei Márk";
+                    if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
+                        displayName = rawName;
+                    } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
+                        displayName = "Mizsei Márk";
+                    } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri")) {
+                        displayName = "Őri Csaba";
+                    } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
+                        displayName = "Kovács Péter";
+                    } else if (rawName && !rawName.includes("@")) {
+                        displayName = rawName;
+                    }
+
+                    list.push({
+                        id: doc.id,
+                        settlementName: data.settlementName || "Apaj",
+                        streetName: data.streetName || "Helyszín",
+                        dateString: data.dateString || "",
+                        timestamp: Number(data.timestamp) || 0,
+                        userEmail: rawEmail,
+                        userName: displayName,
+                        note: data.note || ""
+                    });
+                });
+                cleaningRecords = list;
+                renderCleaningTable();
+            }, (error) => {
+                console.warn("Firestore cleaning_records snapshot error:", error);
                 fetchCleaningRecordsFromRest();
             });
+
         } catch (e) {
             console.warn("Firebase initialization warning:", e);
+            fetchElectricityReadingsFromRest();
+            fetchCleaningRecordsFromRest();
         }
+    } else {
+        fetchElectricityReadingsFromRest();
+        fetchCleaningRecordsFromRest();
     }
 }
 
