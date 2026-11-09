@@ -9,10 +9,12 @@ const firebaseConfig = {
 };
 
 let electricityReadings = [
-    { id: '1', settlementName: 'Apaj', meterName: 'I. számú Dobó I. u. vezérlőszekrény', dayKwh: 9085, dateString: '2026. 11. 08.', timestamp: 1000, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
-    { id: '2', settlementName: 'Apaj', meterName: 'II. számú Dobó I. u. vezérlőszekrény', dayKwh: 46184, dateString: '2026. 11. 08.', timestamp: 1001, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
-    { id: '3', settlementName: 'Apaj', meterName: 'III. számú Tópart u. vezérlőszekrény', dayKwh: 5761, dateString: '2026. 11. 08.', timestamp: 1002, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' }
+    { id: '1', settlementName: 'Apaj', meterName: 'I. számú Dobó I. u.', dayKwh: 9085, dateString: '2026. 11. 08.', timestamp: 1000, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
+    { id: '2', settlementName: 'Apaj', meterName: 'II. számú Dobó I. u.', dayKwh: 46184, dateString: '2026. 11. 08.', timestamp: 1001, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
+    { id: '3', settlementName: 'Apaj', meterName: 'III. számú Tópart u.', dayKwh: 5761, dateString: '2026. 11. 08.', timestamp: 1002, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' }
 ];
+
+let cleaningRecords = [];
 
 function checkWebSession() {
     const isAuth = sessionStorage.getItem('bviz_web_auth') || localStorage.getItem('bviz_web_auth');
@@ -56,6 +58,27 @@ function handleWebLogout() {
     sessionStorage.removeItem('bviz_web_auth');
     localStorage.removeItem('bviz_web_auth');
     checkWebSession();
+}
+
+function switchWebTab(tabName) {
+    const tabElec = document.getElementById('webTabElectricity');
+    const tabClean = document.getElementById('webTabCleaning');
+    const secElec = document.getElementById('electricitySection');
+    const secClean = document.getElementById('cleaningSection');
+
+    if (tabName === 'cleaning') {
+        if (tabElec) tabElec.classList.remove('active');
+        if (tabClean) tabClean.classList.add('active');
+        if (secElec) secElec.style.display = 'none';
+        if (secClean) secClean.style.display = 'block';
+        fetchCleaningRecordsFromRest();
+    } else {
+        if (tabElec) tabElec.classList.add('active');
+        if (tabClean) tabClean.classList.remove('active');
+        if (secElec) secElec.style.display = 'block';
+        if (secClean) secClean.style.display = 'none';
+        fetchElectricityReadingsFromRest();
+    }
 }
 
 function openEditModal(docId) {
@@ -157,7 +180,7 @@ function exportToExcel() {
     }
 
     let csvContent = "\uFEFF";
-    csvContent += "Leolvasás Dátuma;Város / Település;Utca / Vezérlőszekrény;Óraállás (kWh);Fogyasztási Különbség (kWh);Rögzítő Neve;Megjegyzés\n";
+    csvContent += "Leolvasás Dátuma;Város / Település;Utca / Helyszín;Óraállás (kWh);Fogyasztási Különbség (kWh);Rögzítő Neve;Megjegyzés\n";
 
     sortedDesc.forEach((item) => {
         const sameMeterReadings = sortedAsc.filter(r => (r.settlementName || '').trim().toLowerCase() === (item.settlementName || '').trim().toLowerCase() && (r.meterName || '').trim().toLowerCase() === (item.meterName || '').trim().toLowerCase());
@@ -170,7 +193,7 @@ function exportToExcel() {
         const line = [
             `"${item.dateString}"`,
             `"${item.settlementName || 'Apaj'}"`,
-            `"${item.meterName || 'Vezérlőszekrény'}"`,
+            `"${item.meterName || 'Helyszín'}"`,
             `"${item.dayKwh}"`,
             `"${diffText}"`,
             `"${item.userName || 'Mizsei Márk'}"`,
@@ -246,12 +269,150 @@ async function fetchElectricityReadingsFromRest() {
     }
 }
 
+async function fetchCleaningRecordsFromRest() {
+    try {
+        const response = await fetch("https://firestore.googleapis.com/v1/projects/bviz-1cf84/databases/(default)/documents/cleaning_records");
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!data.documents || data.documents.length === 0) return;
+
+        const cloudList = data.documents.map(doc => {
+            const fields = doc.fields || {};
+            const docId = doc.name.split('/').pop();
+            const settlement = fields.settlementName ? fields.settlementName.stringValue : "Apaj";
+            const street = fields.streetName ? fields.streetName.stringValue : "Helyszín";
+            const dateStr = fields.dateString ? fields.dateString.stringValue : "";
+            const tsVal = fields.timestamp ? Number(fields.timestamp.integerValue || fields.timestamp.doubleValue || 0) : 0;
+            const rawEmail = fields.userEmail ? fields.userEmail.stringValue : "";
+            const rawName = fields.userName ? fields.userName.stringValue : "";
+
+            let displayName = "Mizsei Márk";
+            if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
+                displayName = rawName;
+            } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
+                displayName = "Mizsei Márk";
+            } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri")) {
+                displayName = "Őri Csaba";
+            } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
+                displayName = "Kovács Péter";
+            } else if (rawName && !rawName.includes("@")) {
+                displayName = rawName;
+            }
+
+            return {
+                id: docId,
+                settlementName: settlement,
+                streetName: street,
+                dateString: dateStr,
+                timestamp: tsVal,
+                userEmail: rawEmail,
+                userName: displayName,
+                note: fields.note ? fields.note.stringValue : ""
+            };
+        });
+
+        if (cloudList.length > 0) {
+            cleaningRecords = cloudList;
+            renderCleaningTable();
+        }
+    } catch (e) {
+        console.warn("REST API cleaning fetch error:", e);
+    }
+}
+
+function renderCleaningTable() {
+    const tbody = document.getElementById('cleaningTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const sortedDesc = [...cleaningRecords].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    sortedDesc.forEach((item) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td><strong>${item.dateString}</strong></td>
+            <td><span style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1b5e20;">🚛 ${item.settlementName || 'Apaj'}</span></td>
+            <td><strong>${item.streetName || 'Helyszín'}</strong></td>
+            <td><strong style="color: #1b5e20;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>
+            <td>${item.note || '-'}</td>
+            <td style="text-align: center;">
+                <button onclick="deleteCleaningRecordFromWeb('${item.id}')" style="background: #ffebee; border: 1px solid #ef5350; color: #c62828; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;" title="Törlés">
+                    🗑 Törlés
+                </button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function deleteCleaningRecordFromWeb(docId) {
+    if (confirm("Biztosan törölni szeretnéd ezt a takarítási adatot?")) {
+        cleaningRecords = cleaningRecords.filter(r => r.id !== docId);
+        renderCleaningTable();
+
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                db.collection("cleaning_records").doc(docId).delete()
+                    .then(() => {
+                        console.log("Sikeresen törölve a Firestore-ból:", docId);
+                        fetchCleaningRecordsFromRest();
+                    })
+                    .catch(e => console.error("Hiba a Firestore törlésnél:", e));
+            } catch (e) {
+                console.error("Firebase hiba:", e);
+            }
+        }
+    }
+}
+
+function exportCleaningToExcel() {
+    if (cleaningRecords.length === 0) {
+        alert("Nincs letölthető takarítási adat!");
+        return;
+    }
+
+    const sortedDesc = [...cleaningRecords].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    let csvContent = "\uFEFF";
+    csvContent += "Takarítás Dátuma;Város / Település;Utca / Helyszín;Rögzítő Neve;Megjegyzés\n";
+
+    sortedDesc.forEach((item) => {
+        const line = [
+            `"${item.dateString}"`,
+            `"${item.settlementName || 'Apaj'}"`,
+            `"${item.streetName || 'Helyszín'}"`,
+            `"${item.userName || 'Mizsei Márk'}"`,
+            `"${(item.note || '-').replace(/"/g, '""')}"`
+        ].join(";");
+
+        csvContent += line + "\n";
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement("a");
+    const url = URL.createObjectURL(blob);
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `Bviz_Takaritasi_Nyilvantartas_${dateStr}.csv`;
+
+    link.setAttribute("href", url);
+    link.setAttribute("download", fileName);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+}
+
 function initDashboard() {
     renderTable();
+    renderCleaningTable();
     fetchElectricityReadingsFromRest();
+    fetchCleaningRecordsFromRest();
 
     // Poll every 2 seconds for guaranteed 100% instant REST API live sync
-    setInterval(fetchElectricityReadingsFromRest, 2000);
+    setInterval(() => {
+        fetchElectricityReadingsFromRest();
+        fetchCleaningRecordsFromRest();
+    }, 2000);
 
     // Also connect to Firebase Web SDK onSnapshot
     if (typeof firebase !== 'undefined') {
@@ -261,8 +422,10 @@ function initDashboard() {
 
             db.collection("electricity_readings").onSnapshot((snapshot) => {
                 fetchElectricityReadingsFromRest();
-            }, (error) => {
-                console.warn("Firestore electricity_readings snapshot warning:", error);
+            });
+
+            db.collection("cleaning_records").onSnapshot((snapshot) => {
+                fetchCleaningRecordsFromRest();
             });
         } catch (e) {
             console.warn("Firebase initialization warning:", e);
@@ -310,14 +473,14 @@ function renderTable() {
         const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
 
         const diffKwh = prev ? (item.dayKwh - prev.dayKwh) : null;
-        const diffText = diffKwh !== null ? (diffKwh >= 0 ? '+' + diffKwh.toFixed(0) + ' kWh' : diffKwh.toFixed(0) + ' kWh') : '-';
+        const diffText = diffKwh !== null ? (diffKwh >= 0 ? '+' + diffKwh.toFixed(0) : diffKwh.toFixed(0)) : '-';
         const isPos = diffKwh === null || diffKwh >= 0;
 
         const row = document.createElement('tr');
         row.innerHTML = `
             <td><strong>${item.dateString}</strong></td>
             <td><span style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1b5e20;">⚡ ${item.settlementName || 'Apaj'}</span></td>
-            <td><strong>${item.meterName || 'Vezérlőszekrény'}</strong></td>
+            <td><strong>${item.meterName || 'Helyszín'}</strong></td>
             <td style="font-size: 15px; font-weight: bold; color: #1565c0;">${item.dayKwh} kWh</td>
             <td><span style="background: ${isPos ? '#fff3e0' : '#ffebee'}; color: ${isPos ? '#e65100' : '#c62828'}; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${diffText}</span></td>
             <td><strong style="color: #1b5e20;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>

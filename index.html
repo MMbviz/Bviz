@@ -3,11 +3,37 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bviz - Villanyórák Vezetői Irányítópult</title>
+    <title>Bviz - Vezetői Irányítópult</title>
     <link rel="stylesheet" href="styles.css">
     <!-- Firebase Web SDK -->
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <style>
+        .web-tab-bar {
+            display: flex;
+            gap: 12px;
+            margin: 20px 0 10px 0;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 12px;
+        }
+        .web-tab-button {
+            background: #f5f5f5;
+            color: #1b5e20;
+            border: 2px solid #1b5e20;
+            padding: 12px 28px;
+            border-radius: 24px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.2s ease-in-out;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+        }
+        .web-tab-button.active, .web-tab-button:hover {
+            background: #1b5e20;
+            color: #ffffff;
+            box-shadow: 0 4px 12px rgba(27,94,32,0.3);
+        }
+    </style>
 </head>
 <body>
 
@@ -15,7 +41,7 @@
     <div id="loginScreen" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 420px; text-align: center; border-top: 6px solid #1b5e20;">
             <h1 style="color: #1b5e20; margin-bottom: 6px; font-size: 32px;">⚡ Bviz</h1>
-            <p style="color: #666; font-size: 14px; margin-bottom: 24px;">Villanyórák Vezetői Irányítópult — Zárt Bejelentkezés</p>
+            <p style="color: #666; font-size: 14px; margin-bottom: 24px;">Vezetői Irányítópult — Zárt Bejelentkezés</p>
             <form id="loginForm" onsubmit="handleWebLogin(event)">
                 <div style="margin-bottom: 16px; text-align: left;">
                     <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
@@ -47,7 +73,7 @@
             <!-- Center Logo Area -->
             <div class="logo-area">
                 <h1>⚡ Bviz</h1>
-                <span class="subtitle">Villanyórák & Utcai Vezérlőszekrények Vezetői Irányítópult</span>
+                <span class="subtitle">Vezetői Irányítópult & Nyilvántartás</span>
             </div>
 
             <!-- Right User Status & Logout -->
@@ -57,65 +83,109 @@
             </div>
         </header>
 
-        <!-- Summary Cards -->
-        <section class="summary-cards">
-            <div class="card card-green" style="border-left: 5px solid #1b5e20;">
-                <h3>Összes Villanyóra Leolvasás</h3>
-                <div class="value" id="totalReadingsCount">0 db</div>
-                <div class="subtext">A rendszerben rögzített leolvasások</div>
-            </div>
-            <div class="card card-orange" style="border-left: 5px solid #f57c00;">
-                <h3>Legutóbbi Rögzítő</h3>
-                <div class="value" id="latestUploader">Mizsei Márk</div>
-                <div class="subtext" id="latestDate">Legutóbbi rögzítés dátuma</div>
-            </div>
-            <div class="card card-purple" style="border-left: 5px solid #6a1b9a;">
-                <h3>Kezelt Települések (9 Város)</h3>
-                <div class="value" style="font-size: 18px; color: #1b5e20;">Apaj, Kunszentmiklós, Apostag, Dunavecse...</div>
-                <div class="subtext">Utcaszintű vezérlőszekrény nyilvántartás</div>
-            </div>
-        </section>
+        <!-- Web Navigation Tabs -->
+        <nav class="web-tab-bar">
+            <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')">
+                ⚡ Villanyórák Leolvasása
+            </button>
+            <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')">
+                🚛 Takarítási Nyilvántartás
+            </button>
+        </nav>
 
-        <!-- Data Table -->
-        <section class="table-section">
-            <div class="table-header-row">
-                <h2>⚡ Villanyórák Leolvasási Előzményei & Utcaszintű Fogyasztás</h2>
-                <div>
-                    <label for="plantFilter"><strong>Város szűrése: </strong></label>
-                    <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold;">
-                        <option value="ALL">Minden Város</option>
-                        <option value="Apaj">Apaj</option>
-                        <option value="Kunszentmiklós">Kunszentmiklós</option>
-                        <option value="Apostag">Apostag</option>
-                        <option value="Dunavecse">Dunavecse</option>
-                        <option value="Szabadszállás">Szabadszállás</option>
-                        <option value="Kunadacs">Kunadacs</option>
-                        <option value="Szalkszentmárton">Szalkszentmárton</option>
-                        <option value="Tass">Tass</option>
-                        <option value="Kunpeszér">Kunpeszér</option>
-                    </select>
+        <!-- SECTION 1: Electricity Meter Readings -->
+        <div id="electricitySection">
+            <!-- Summary Cards -->
+            <section class="summary-cards">
+                <div class="card card-green" style="border-left: 5px solid #1b5e20;">
+                    <h3>Összes Villanyóra Leolvasás</h3>
+                    <div class="value" id="totalReadingsCount">0 db</div>
+                    <div class="subtext">A rendszerben rögzített leolvasások</div>
                 </div>
-            </div>
-            <div class="table-wrapper">
-                <table class="data-table">
-                    <thead>
-                        <tr>
-                            <th>Leolvasás Dátuma</th>
-                            <th>Város / Település</th>
-                            <th>Utca / Vezérlőszekrény</th>
-                            <th>Leolvasott Óraállás (kWh)</th>
-                            <th>Fogyasztási Különbség (kWh)</th>
-                            <th>Rögzítő Neve</th>
-                            <th>Megjegyzés</th>
-                            <th>Műveletek</th>
-                        </tr>
-                    </thead>
-                    <tbody id="readingsTableBody">
-                        <!-- Loaded dynamically in app.js -->
-                    </tbody>
-                </table>
-            </div>
-        </section>
+                <div class="card card-orange" style="border-left: 5px solid #f57c00;">
+                    <h3>Legutóbbi Rögzítő</h3>
+                    <div class="value" id="latestUploader">Mizsei Márk</div>
+                    <div class="subtext" id="latestDate">Legutóbbi rögzítés dátuma</div>
+                </div>
+                <div class="card card-purple" style="border-left: 5px solid #6a1b9a;">
+                    <h3>Kezelt Települések (9 Város)</h3>
+                    <div class="value" style="font-size: 18px; color: #1b5e20;">Apaj, Kunszentmiklós, Apostag, Dunavecse...</div>
+                    <div class="subtext">Utcaszintű vezérlőszekrény nyilvántartás</div>
+                </div>
+            </section>
+
+            <!-- Data Table -->
+            <section class="table-section">
+                <div class="table-header-row">
+                    <h2>⚡ Villanyórák Leolvasási Előzményei & Utcaszintű Fogyasztás</h2>
+                    <div>
+                        <label for="plantFilter"><strong>Város szűrése: </strong></label>
+                        <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 6px; border: 1px solid #ccc; font-weight: bold;">
+                            <option value="ALL">Minden Város</option>
+                            <option value="Apaj">Apaj</option>
+                            <option value="Kunszentmiklós">Kunszentmiklós</option>
+                            <option value="Apostag">Apostag</option>
+                            <option value="Dunavecse">Dunavecse</option>
+                            <option value="Szabadszállás">Szabadszállás</option>
+                            <option value="Kunadacs">Kunadacs</option>
+                            <option value="Szalkszentmárton">Szalkszentmárton</option>
+                            <option value="Tass">Tass</option>
+                            <option value="Kunpeszér">Kunpeszér</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Leolvasás Dátuma</th>
+                                <th>Város / Település</th>
+                                <th>Utca / Vezérlőszekrény</th>
+                                <th>Leolvasott Óraállás (kWh)</th>
+                                <th>Fogyasztási Különbség (kWh)</th>
+                                <th>Rögzítő Neve</th>
+                                <th>Megjegyzés</th>
+                                <th>Műveletek</th>
+                            </tr>
+                        </thead>
+                        <tbody id="readingsTableBody">
+                            <!-- Loaded dynamically in app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
+
+        <!-- SECTION 2: Cleaning Records (Only visible when clicking 'Takarítás' tab!) -->
+        <div id="cleaningSection" style="display: none;">
+            <section class="table-section" style="margin-top: 20px;">
+                <div class="table-header-row">
+                    <h2>🚛 Takarítási & Karbantartási Nyilvántartás</h2>
+                    <div>
+                        <button onclick="exportCleaningToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px;">
+                            📊 Takarítás Excel Letöltés (.csv)
+                        </button>
+                    </div>
+                </div>
+                <div class="table-wrapper">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Takarítás Dátuma</th>
+                                <th>Város / Település</th>
+                                <th>Utca / Helyszín</th>
+                                <th>Rögzítő Neve</th>
+                                <th>Megjegyzés / Karbantartási Észrevételek</th>
+                                <th>Műveletek</th>
+                            </tr>
+                        </thead>
+                        <tbody id="cleaningTableBody">
+                            <!-- Loaded dynamically in app.js -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+        </div>
     </div>
 
     <!-- Edit Reading Modal -->
