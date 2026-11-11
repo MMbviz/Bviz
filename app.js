@@ -8,11 +8,7 @@ const firebaseConfig = {
     appId: "1:1076211077079:web:bviz"
 };
 
-let electricityReadings = [
-    { id: '1', settlementName: 'Apaj', meterName: 'I. számú Dobó I. u.', dayKwh: 9085, dateString: '2026. 11. 08.', timestamp: 1000, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
-    { id: '2', settlementName: 'Apaj', meterName: 'II. számú Dobó I. u.', dayKwh: 46184, dateString: '2026. 11. 08.', timestamp: 1001, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' },
-    { id: '3', settlementName: 'Apaj', meterName: 'III. számú Tópart u.', dayKwh: 5761, dateString: '2026. 11. 08.', timestamp: 1002, userEmail: 'mizsei92@freemail.hu', userName: 'Mizsei Márk', note: '' }
-];
+let electricityReadings = [];
 
 let cleaningRecords = [];
 let pumpRecords = [];
@@ -115,15 +111,58 @@ function switchWebTab(tabName) {
 }
 
 function openEditModal(docId) {
-    const item = electricityReadings.find(r => r.id === docId);
-    if (!item) return;
+    let item = electricityReadings.find(r => r.id === docId);
+    let town = 'Apaj';
+    let street = 'Helyszín';
 
-    document.getElementById('editReadingId').value = item.id;
-    document.getElementById('editSettlement').value = item.settlementName || 'Apaj';
-    document.getElementById('editMeterName').value = item.meterName || 'Vezérlőszekrény';
-    document.getElementById('editDayKwh').value = item.dayKwh || 0;
-    document.getElementById('editDateString').value = item.dateString || '';
-    document.getElementById('editUserName').value = item.userName || 'Mizsei Márk';
+    if (item) {
+        town = item.settlementName;
+        street = item.meterName;
+    } else if (docId.startsWith('elec_')) {
+        const parts = docId.split('_');
+        town = (parts[1] || 'Apaj').replace(/_/g, ' ');
+        street = (parts.slice(2).join(' ') || 'Helyszín').replace(/_/g, ' ');
+    }
+
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
+
+    const sameMeterReadings = electricityReadings.filter(r =>
+        normalizeStreetName(r.settlementName) === normTown &&
+        normalizeStreetName(r.meterName) === normStreet
+    ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    const fixedDoc = sameMeterReadings.find(r => r.id === fixedDocId);
+    const latestReading = fixedDoc || (sameMeterReadings.length > 0 ? sameMeterReadings[0] : null);
+    const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
+
+    // Current reading (Óraállás - Column 5)
+    let currKwhValue = '';
+    if (latestReading && latestReading.dayKwh > 0) {
+        currKwhValue = Math.round(latestReading.dayKwh);
+    }
+
+    // Previous reading (Előző Óraállás - Column 4)
+    let prevKwhValue = '';
+    if (latestReading && latestReading.dayKwh > 0) {
+        const baselinePrev = (latestReading.prevDayKwh && latestReading.prevDayKwh > 0) ? latestReading.prevDayKwh : ((previousReading && previousReading.dayKwh > 0) ? previousReading.dayKwh : null);
+        if (baselinePrev !== null && baselinePrev > 0) {
+            prevKwhValue = Math.round(baselinePrev);
+        }
+    } else if (latestReading && latestReading.prevDayKwh && latestReading.prevDayKwh > 0) {
+        prevKwhValue = Math.round(latestReading.prevDayKwh);
+    }
+
+    document.getElementById('editReadingId').value = latestReading ? latestReading.id : fixedDocId;
+    document.getElementById('editSettlement').value = (town || 'Apaj').replace(/_/g, ' ');
+    document.getElementById('editMeterName').value = (street || 'Helyszín').replace(/_/g, ' ');
+    document.getElementById('editPrevDayKwh').value = prevKwhValue;
+    document.getElementById('editDayKwh').value = currKwhValue;
+    document.getElementById('editDateString').value = (latestReading ? latestReading.dateString : '') || '2026. 11. 11.';
+    document.getElementById('editUserName').value = (latestReading ? latestReading.userName : '') || 'Vezetői Weboldal';
+    const noteElem = document.getElementById('editReadingNote');
+    if (noteElem) noteElem.value = (latestReading ? latestReading.note : '') || '';
 
     const modal = document.getElementById('editModal');
     if (modal) modal.style.display = 'flex';
@@ -136,38 +175,87 @@ function closeEditModal() {
 
 function saveEditFromWeb() {
     const docId = document.getElementById('editReadingId').value;
-    const dayKwh = Number(document.getElementById('editDayKwh').value);
+    const settlementName = document.getElementById('editSettlement').value.trim();
+    const meterName = document.getElementById('editMeterName').value.trim();
+    const dayKwhVal = document.getElementById('editDayKwh').value.trim();
+    const prevDayKwhVal = document.getElementById('editPrevDayKwh').value.trim();
     const dateString = document.getElementById('editDateString').value.trim();
-    const userName = document.getElementById('editUserName').value.trim();
+    const userName = document.getElementById('editUserName').value.trim() || 'Vezetői Weboldal';
+    const noteText = document.getElementById('editReadingNote') ? document.getElementById('editReadingNote').value.trim() : '';
 
-    if (isNaN(dayKwh) || dayKwh < 0) {
-        alert("Kérjük adj meg egy érvényes óraállást!");
-        return;
+    const dayKwh = dayKwhVal !== '' ? Number(dayKwhVal) : 0;
+    const prevDayKwh = prevDayKwhVal !== '' && !isNaN(Number(prevDayKwhVal)) ? Number(prevDayKwhVal) : null;
+
+    const fixedDocId = `elec_${settlementName}_${meterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+
+    let idx = electricityReadings.findIndex(r =>
+        (r.settlementName || '').trim().toLowerCase() === settlementName.toLowerCase() &&
+        (r.meterName || '').trim().toLowerCase() === meterName.toLowerCase()
+    );
+
+    const payload = {
+        settlementName: settlementName,
+        meterName: meterName,
+        dayKwh: dayKwh,
+        dateString: dateString,
+        userName: userName,
+        note: noteText,
+        userEmail: 'bviz@bviz.hu',
+        timestamp: Date.now()
+    };
+
+    if (prevDayKwh !== null && !isNaN(prevDayKwh)) {
+        payload.prevDayKwh = prevDayKwh;
+    } else if (typeof firebase !== 'undefined') {
+        payload.prevDayKwh = firebase.firestore.FieldValue.delete();
     }
 
-    const idx = electricityReadings.findIndex(r => r.id === docId);
     if (idx >= 0) {
+        electricityReadings[idx].settlementName = settlementName;
+        electricityReadings[idx].meterName = meterName;
         electricityReadings[idx].dayKwh = dayKwh;
+        if (prevDayKwh !== null && !isNaN(prevDayKwh)) {
+            electricityReadings[idx].prevDayKwh = prevDayKwh;
+        } else {
+            delete electricityReadings[idx].prevDayKwh;
+        }
         electricityReadings[idx].dateString = dateString;
         electricityReadings[idx].userName = userName;
-        renderTable();
+        electricityReadings[idx].note = noteText;
+        electricityReadings[idx].timestamp = Date.now();
+    } else {
+        const newRecord = {
+            id: fixedDocId,
+            settlementName: settlementName,
+            meterName: meterName,
+            dayKwh: dayKwh,
+            prevDayKwh: prevDayKwh,
+            dateString: dateString,
+            userEmail: 'bviz@bviz.hu',
+            userName: userName,
+            note: noteText,
+            timestamp: Date.now()
+        };
+        electricityReadings.unshift(newRecord);
     }
 
     if (typeof firebase !== 'undefined') {
         try {
             const db = firebase.firestore();
-            db.collection("electricity_readings").doc(docId).update({
-                dayKwh: dayKwh,
-                dateString: dateString,
-                userName: userName
-            })
-            .then(() => console.log("Sikeresen frissítve a Firestore-ban:", docId))
-            .catch(e => console.error("Hiba a Firestore frissítésnél:", e));
+            db.collection("electricity_readings").doc(fixedDocId).set(payload, { merge: true })
+                .then(() => console.log("Sikeresen frissítve a Firestore-ban (mindkét óraállás):", fixedDocId))
+                .catch(e => console.error("Hiba a Firestore frissítésnél:", e));
+
+            if (dayKwh > 0) {
+                const archiveId = `hist_${settlementName}_${meterName}_${dateString.replace(/\./g, '').replace(/\s+/g, '')}`.replace(/\s+/g, '_');
+                db.collection("electricity_readings").doc(archiveId).set(payload, { merge: true });
+            }
         } catch (e) {
             console.error("Firebase update error:", e);
         }
     }
 
+    renderTable();
     closeEditModal();
 }
 
@@ -257,6 +345,7 @@ async function fetchElectricityReadingsFromRest() {
             const meter = fields.meterName ? fields.meterName.stringValue : "I. számú Dobó I. u.";
             const dateStr = fields.dateString ? fields.dateString.stringValue : "";
             const dayVal = fields.dayKwh ? (fields.dayKwh.doubleValue !== undefined ? fields.dayKwh.doubleValue : Number(fields.dayKwh.integerValue || 0)) : 0;
+            const prevVal = fields.prevDayKwh ? (fields.prevDayKwh.doubleValue !== undefined ? fields.prevDayKwh.doubleValue : Number(fields.prevDayKwh.integerValue || 0)) : null;
             const tsVal = fields.timestamp ? Number(fields.timestamp.integerValue || fields.timestamp.doubleValue || 0) : 0;
             const rawEmail = fields.userEmail ? fields.userEmail.stringValue : "";
             const rawName = fields.userName ? fields.userName.stringValue : "";
@@ -281,6 +370,7 @@ async function fetchElectricityReadingsFromRest() {
                 dateString: dateStr,
                 timestamp: tsVal,
                 dayKwh: dayVal,
+                prevDayKwh: prevVal,
                 userEmail: rawEmail,
                 userName: displayName,
                 note: fields.note ? fields.note.stringValue : ""
@@ -457,6 +547,13 @@ function renderCleaningTable() {
 
     displayList.forEach((item) => {
         const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.title = 'Kattints a sorra a szerkesztéshez!';
+        row.onclick = (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                openCleaningEditModal(item.id);
+            }
+        };
         row.innerHTML = `
             <td><strong>${item.dateString}</strong></td>
             <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">🚛 ${item.settlementName || 'Apaj'}</span></td>
@@ -464,9 +561,6 @@ function renderCleaningTable() {
             <td><strong style="color: #0077b6;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>
             <td>${item.note || '-'}</td>
             <td style="text-align: center; white-space: nowrap;">
-                <button onclick="openCleaningEditModal('${item.id}')" class="btn-icon-edit" title="Szerkesztés">
-                    ✏️
-                </button>
                 <button onclick="deleteCleaningRecordFromWeb('${item.id}')" class="btn-icon-delete" title="Törlés">
                     🗑
                 </button>
@@ -529,8 +623,8 @@ function openPumpVisualView(town, street) {
     const visualContainer = document.getElementById('pumpVisualContainer');
     if (!visualContainer) return;
 
-    currentVisualTown = town;
-    currentVisualStreet = street;
+    currentVisualTown = (town || '').replace(/_/g, ' ');
+    currentVisualStreet = (street || '').replace(/_/g, ' ');
 
     const record = pumpRecords.find(r =>
         (r.settlementName || '').trim().toLowerCase() === town.trim().toLowerCase() &&
@@ -611,74 +705,79 @@ function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial) {
     const visualContainer = document.getElementById('pumpVisualContainer');
     if (!visualContainer) return;
 
-    const p1Bg = currentP1State === 1 ? '#2e7d32' : (currentP1State === 2 ? '#c62828' : '#ffffff');
-    const p1Text = currentP1State === 0 ? '#1b5e20' : '#ffffff';
-    const p1Border = currentP1State === 0 ? '2px solid #1b5e20' : 'none';
-    const p1Label = currentP1State === 1 ? 'Működő szivattyú' : (currentP1State === 2 ? 'Rossz szivattyú' : 'Nincs szivattyú');
-    const p1LabelColor = currentP1State === 1 ? '#2e7d32' : (currentP1State === 2 ? '#c62828' : '#777777');
+    const p1ChipBg = currentP1State === 1 ? '#e6f4ea' : (currentP1State === 2 ? '#fee2e2' : '#f1f5f9');
+    const p1ChipText = currentP1State === 1 ? '● Üzemel' : (currentP1State === 2 ? '● Hibás' : 'Nincs szivattyú');
+    const p1ChipColor = currentP1State === 1 ? '#137333' : (currentP1State === 2 ? '#b91c1c' : '#64748b');
 
-    const p2Bg = currentP2State === 1 ? '#2e7d32' : (currentP2State === 2 ? '#c62828' : '#ffffff');
-    const p2Text = currentP2State === 0 ? '#1b5e20' : '#ffffff';
-    const p2Border = currentP2State === 0 ? '2px solid #1b5e20' : 'none';
-    const p2Label = currentP2State === 1 ? 'Működő szivattyú' : (currentP2State === 2 ? 'Rossz szivattyú' : 'Nincs szivattyú');
-    const p2LabelColor = currentP2State === 1 ? '#2e7d32' : (currentP2State === 2 ? '#c62828' : '#777777');
+    const p2ChipBg = currentP2State === 1 ? '#e6f4ea' : (currentP2State === 2 ? '#fee2e2' : '#f1f5f9');
+    const p2ChipText = currentP2State === 1 ? '● Üzemel' : (currentP2State === 2 ? '● Hibás' : 'Nincs szivattyú');
+    const p2ChipColor = currentP2State === 1 ? '#137333' : (currentP2State === 2 ? '#b91c1c' : '#64748b');
 
     visualContainer.innerHTML = `
-        <div style="background: #ffffff; border: 3px solid #1b5e20; border-radius: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); max-width: 540px; margin: 0 auto; overflow: hidden;">
-            <!-- Mobile App Title Header -->
-            <div style="background: #1b5e20; padding: 18px 24px; color: white;">
-                <h3 style="font-size: 22px; font-weight: bold; margin-bottom: 2px;">${currentVisualStreet}</h3>
-                <p style="font-size: 14px; color: #c8e6c9;">${currentVisualTown} — Szivattyú Nyilvántartás</p>
+        <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 600px; margin: 0 auto; overflow: hidden; border: 1px solid #cbd5e1;">
+            <!-- Header Banner (#0077b6 ocean blue) -->
+            <div style="background: #0077b6; padding: 16px 20px; color: white; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #ffffff;">${currentVisualStreet}</h3>
+                    <p style="font-size: 13px; color: #e0f7fa; margin-top: 2px;">${currentVisualTown} • Szivattyú nyilvántartás</p>
+                </div>
+                <button onclick="document.getElementById('pumpVisualContainer').style.display='none'" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 13px;">✕ Bezárás</button>
             </div>
 
-            <div style="padding: 24px;">
-                <h4 style="text-align: center; color: #1b5e20; font-size: 16px; font-weight: bold; margin-bottom: 4px;">Szivattyú Állapotok és Adatok (Webes Szerkesztés)</h4>
-                <p style="text-align: center; color: #777; font-size: 12px; margin-bottom: 20px;">Koppints a kockára a szín váltásához! Írj a mezőkbe a szerkesztéshez!</p>
+            <div style="padding: 20px;">
+                <!-- Side-by-Side 2-Column App Layout matching Image 1 -->
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                    <!-- Column 1: 1. sz. Szivattyú Card -->
+                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;">
+                        <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">1. sz. Szivattyú</h4>
 
-                <!-- Side-by-Side 2-Column App Layout -->
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                    <!-- Column 1: Pump 1 -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <!-- Clickable Cube 1 -->
-                        <div onclick="cycleWebCube(1)" title="Kattints a váltáshoz!" style="width: 84px; height: 84px; background: ${p1Bg}; border: ${p1Border}; border-radius: 16px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.12); margin-bottom: 8px; cursor: pointer; transition: transform 0.1s;">
-                            <span style="color: ${p1Text}; font-size: 13px; font-weight: bold; text-align: center; user-select: none;">1. Szivattyú</span>
+                        <!-- Clickable Status Chip -->
+                        <div onclick="cycleWebCube(1)" title="Kattints a státusz váltásához!" style="background: ${p1ChipBg}; color: ${p1ChipColor}; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; display: inline-block; margin-bottom: 14px; user-select: none;">
+                            ${p1ChipText}
                         </div>
-                        <span style="color: ${p1LabelColor}; font-weight: bold; font-size: 13px; text-align: center; margin-bottom: 14px;">${p1Label}</span>
 
-                        <!-- Editable Inputs for Pump 1 -->
-                        <div style="width: 100%; text-align: left; margin-bottom: 10px;">
-                            <label style="display: block; font-size: 11px; font-weight: bold; color: #1b5e20; margin-bottom: 3px;">Fajtája:</label>
-                            <input type="text" id="webP1Type" oninput="saveCurrentVisualPump(false)" value="${p1Type}" placeholder="" style="width: 100%; padding: 9px; border-radius: 8px; border: 2px solid #1b5e20; background: #ffffff; font-size: 13px; font-weight: 600; box-sizing: border-box;">
+                        <!-- Editable Inputs for Pump 1 with Clear X -->
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Fajtája</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP1Type" value="${p1Type}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p1Type ? '<span onclick="clearWebInput(\'webP1Type\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
                         </div>
-                        <div style="width: 100%; text-align: left;">
-                            <label style="display: block; font-size: 11px; font-weight: bold; color: #1b5e20; margin-bottom: 3px;">Gyári Száma:</label>
-                            <input type="text" id="webP1Serial" oninput="saveCurrentVisualPump(false)" value="${p1Serial}" placeholder="" style="width: 100%; padding: 9px; border-radius: 8px; border: 2px solid #1b5e20; background: #ffffff; font-size: 13px; font-weight: 600; box-sizing: border-box;">
+                        <div style="text-align: left;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Gyári száma</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP1Serial" value="${p1Serial}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p1Serial ? '<span onclick="clearWebInput(\'webP1Serial\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
                         </div>
                     </div>
 
-                    <!-- Column 2: Pump 2 -->
-                    <div style="display: flex; flex-direction: column; align-items: center;">
-                        <!-- Clickable Cube 2 -->
-                        <div onclick="cycleWebCube(2)" title="Kattints a váltáshoz!" style="width: 84px; height: 84px; background: ${p2Bg}; border: ${p2Border}; border-radius: 16px; display: flex; justify-content: center; align-items: center; box-shadow: 0 4px 10px rgba(0,0,0,0.12); margin-bottom: 8px; cursor: pointer; transition: transform 0.1s;">
-                            <span style="color: ${p2Text}; font-size: 13px; font-weight: bold; text-align: center; user-select: none;">2. Szivattyú</span>
-                        </div>
-                        <span style="color: ${p2LabelColor}; font-weight: bold; font-size: 13px; text-align: center; margin-bottom: 14px;">${p2Label}</span>
+                    <!-- Column 2: 2. sz. Szivattyú Card -->
+                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;">
+                        <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">2. sz. Szivattyú</h4>
 
-                        <!-- Editable Inputs for Pump 2 -->
-                        <div style="width: 100%; text-align: left; margin-bottom: 10px;">
-                            <label style="display: block; font-size: 11px; font-weight: bold; color: #1b5e20; margin-bottom: 3px;">Fajtája:</label>
-                            <input type="text" id="webP2Type" oninput="saveCurrentVisualPump(false)" value="${p2Type}" placeholder="" style="width: 100%; padding: 9px; border-radius: 8px; border: 2px solid #1b5e20; background: #ffffff; font-size: 13px; font-weight: 600; box-sizing: border-box;">
+                        <!-- Clickable Status Chip -->
+                        <div onclick="cycleWebCube(2)" title="Kattints a státusz váltásához!" style="background: ${p2ChipBg}; color: ${p2ChipColor}; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; display: inline-block; margin-bottom: 14px; user-select: none;">
+                            ${p2ChipText}
                         </div>
-                        <div style="width: 100%; text-align: left;">
-                            <label style="display: block; font-size: 11px; font-weight: bold; color: #1b5e20; margin-bottom: 3px;">Gyári Száma:</label>
-                            <input type="text" id="webP2Serial" oninput="saveCurrentVisualPump(false)" value="${p2Serial}" placeholder="" style="width: 100%; padding: 9px; border-radius: 8px; border: 2px solid #1b5e20; background: #ffffff; font-size: 13px; font-weight: 600; box-sizing: border-box;">
+
+                        <!-- Editable Inputs for Pump 2 with Clear X -->
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Fajtája</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP2Type" value="${p2Type}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p2Type ? '<span onclick="clearWebInput(\'webP2Type\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
+                        </div>
+                        <div style="text-align: left;">
+                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Gyári száma</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP2Serial" value="${p2Serial}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p2Serial ? '<span onclick="clearWebInput(\'webP2Serial\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
                         </div>
                     </div>
-                </div>
-
-                <!-- Back Button -->
-                <div style="margin-top: 24px; text-align: right;">
-                    <button onclick="closePumpVisualView()" style="background: #1b5e20; color: white; border: none; padding: 10px 24px; border-radius: 20px; font-weight: bold; cursor: pointer;">← Bezárás / Vissza</button>
                 </div>
             </div>
         </div>
@@ -688,6 +787,71 @@ function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial) {
 function closePumpVisualView() {
     const visualContainer = document.getElementById('pumpVisualContainer');
     if (visualContainer) visualContainer.style.display = 'none';
+}
+
+function openCleaningEditModal(docId) {
+    const item = cleaningRecords.find(r => r.id === docId);
+    if (!item) return;
+
+    const idEl = document.getElementById('editCleaningId');
+    const townEl = document.getElementById('editCleaningSettlement');
+    const streetEl = document.getElementById('editCleaningStreet');
+    const dateEl = document.getElementById('editCleaningDateString');
+    const userEl = document.getElementById('editCleaningUserName');
+    const noteEl = document.getElementById('editCleaningNote');
+
+    if (idEl) idEl.value = item.id;
+    if (townEl) townEl.value = (item.settlementName || 'Apaj').replace(/_/g, ' ');
+    if (streetEl) streetEl.value = (item.streetName || 'Helyszín').replace(/_/g, ' ');
+    if (dateEl) dateEl.value = item.dateString || '';
+    if (userEl) userEl.value = item.userName || 'Mizsei Márk';
+    if (noteEl) noteEl.value = item.note || '';
+
+    const modal = document.getElementById('cleaningEditModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeCleaningEditModal() {
+    const modal = document.getElementById('cleaningEditModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveCleaningEditFromWeb() {
+    const docId = document.getElementById('editCleaningId') ? document.getElementById('editCleaningId').value : '';
+    const settlementName = document.getElementById('editCleaningSettlement') ? document.getElementById('editCleaningSettlement').value.trim() : '';
+    const streetName = document.getElementById('editCleaningStreet') ? document.getElementById('editCleaningStreet').value.trim() : '';
+    const dateString = document.getElementById('editCleaningDateString') ? document.getElementById('editCleaningDateString').value.trim() : '';
+    const userName = document.getElementById('editCleaningUserName') ? document.getElementById('editCleaningUserName').value.trim() : '';
+    const note = document.getElementById('editCleaningNote') ? document.getElementById('editCleaningNote').value.trim() : '';
+
+    const idx = cleaningRecords.findIndex(r => r.id === docId);
+    if (idx >= 0) {
+        cleaningRecords[idx].settlementName = settlementName;
+        cleaningRecords[idx].streetName = streetName;
+        cleaningRecords[idx].dateString = dateString;
+        cleaningRecords[idx].userName = userName;
+        cleaningRecords[idx].note = note;
+        renderCleaningTable();
+    }
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("cleaning_records").doc(docId).update({
+                settlementName: settlementName,
+                streetName: streetName,
+                dateString: dateString,
+                userName: userName,
+                note: note
+            })
+            .then(() => console.log("Sikeresen frissítve a Firestore-ban (takarítás):", docId))
+            .catch(e => console.error("Hiba a Firestore frissítésnél (takarítás):", e));
+        } catch (e) {
+            console.error("Firebase update error:", e);
+        }
+    }
+
+    closeCleaningEditModal();
 }
 
 function deleteCleaningRecordFromWeb(docId) {
@@ -711,7 +875,16 @@ function deleteCleaningRecordFromWeb(docId) {
 }
 
 function deletePumpRecordFromWeb(docId) {
-    if (confirm("Biztosan törölni szeretnéd ezt a szivattyú nyilvántartási adatot?")) {
+    if (confirm("Biztosan törölni szeretnéd ezt a szivattyú nyilvántartási adatot/átemelőt?")) {
+        const targetRecord = pumpRecords.find(r => r.id === docId);
+        if (targetRecord) {
+            const town = targetRecord.settlementName;
+            const street = targetRecord.streetName;
+            if (streetMapData[town]) {
+                streetMapData[town] = streetMapData[town].filter(s => s !== street);
+            }
+        }
+
         pumpRecords = pumpRecords.filter(r => r.id !== docId);
         renderPumpTable();
 
@@ -719,10 +892,11 @@ function deletePumpRecordFromWeb(docId) {
             try {
                 const db = firebase.firestore();
                 db.collection("pump_records").doc(docId).delete()
-                    .then(() => {
-                        console.log("Sikeresen törölve a Firestore-ból:", docId);
-                    })
+                    .then(() => console.log("Sikeresen törölve a Firestore-ból (pump_records):", docId))
                     .catch(e => console.error("Hiba a Firestore törlésnél:", e));
+                db.collection("custom_streets").doc(docId).delete()
+                    .then(() => console.log("Sikeresen törölve a custom_streets-ből:", docId))
+                    .catch(e => console.error("Hiba a custom_streets törlésnél:", e));
             } catch (e) {
                 console.error("Firebase hiba:", e);
             }
@@ -821,43 +995,111 @@ function renderPumpTable() {
 
     const tbody = document.getElementById('pumpTableBody');
     const plantFilter = document.getElementById('pumpPlantFilter') ? document.getElementById('pumpPlantFilter').value : 'ALL';
+    const searchQuery = document.getElementById('pumpSearch') ? document.getElementById('pumpSearch').value.trim().toLowerCase() : '';
+    const pageSizeVal = document.getElementById('pumpPageSize') ? document.getElementById('pumpPageSize').value : 'ALL';
+
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const filtered = plantFilter === 'ALL'
-        ? pumpRecords
-        : pumpRecords.filter(r => (r.settlementName || '').trim().toLowerCase() === plantFilter.trim().toLowerCase());
+    // Collect ALL streets across all towns from streetMapData
+    const townsToInclude = plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter];
+    let allStreetRows = [];
 
-    const sortedDesc = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+    townsToInclude.forEach(town => {
+        const streets = streetMapData[town] || [];
+        streets.forEach(street => {
+            const existing = pumpRecords.find(r =>
+                (r.settlementName || '').trim().toLowerCase() === town.trim().toLowerCase() &&
+                (r.streetName || '').trim().toLowerCase() === street.trim().toLowerCase()
+            );
 
-    if (sortedDesc.length === 0) {
+            if (existing) {
+                allStreetRows.push(existing);
+            } else {
+                allStreetRows.push({
+                    id: `${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_'),
+                    settlementName: town,
+                    streetName: street,
+                    dateString: '2026. 11. 11.',
+                    timestamp: 0,
+                    pump1State: 0,
+                    pump1Type: '',
+                    pump1Serial: '',
+                    pump2State: 0,
+                    pump2Type: '',
+                    pump2Serial: '',
+                    userName: 'Rendszer'
+                });
+            }
+        });
+    });
+
+    if (searchQuery) {
+        allStreetRows = allStreetRows.filter(r =>
+            (r.settlementName || '').toLowerCase().includes(searchQuery) ||
+            (r.streetName || '').toLowerCase().includes(searchQuery) ||
+            (r.userName || '').toLowerCase().includes(searchQuery) ||
+            (r.pump1Type || '').toLowerCase().includes(searchQuery) ||
+            (r.pump1Serial || '').toLowerCase().includes(searchQuery) ||
+            (r.pump2Type || '').toLowerCase().includes(searchQuery) ||
+            (r.pump2Serial || '').toLowerCase().includes(searchQuery) ||
+            (r.dateString || '').toLowerCase().includes(searchQuery)
+        );
+    }
+
+    const totalCount = allStreetRows.length;
+    const summaryCountEl = document.getElementById('pumpSummaryCount');
+    if (summaryCountEl) {
+        summaryCountEl.textContent = `Összesen: ${totalCount} bejegyzés`;
+    }
+
+    let displayList = allStreetRows;
+    if (pageSizeVal !== 'ALL') {
+        const size = parseInt(pageSizeVal, 10) || 50;
+        displayList = allStreetRows.slice(0, size);
+    }
+
+    if (displayList.length === 0) {
         const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="7" style="text-align: center; color: #666; padding: 24px; font-size: 14px;">Még nincs rögzített szivattyú adat ehhez a szűréshez. Regisztrálj egyet az applikációban az utcanévre kattintva!</td>`;
+        row.innerHTML = `<td colspan="7" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Még nincs rögzített szivattyú adat ehhez a szűréshez.</td>`;
         tbody.appendChild(row);
         return;
     }
 
-    sortedDesc.forEach((item) => {
-        const p1StatusText = item.pump1State === 1 ? '<span style="color:#2e7d32;font-weight:bold;">🟩 Működik</span>' : (item.pump1State === 2 ? '<span style="color:#c62828;font-weight:bold;">🟥 Rossz</span>' : '<span style="color:gray;">⬜ Nincs</span>');
-        const p2StatusText = item.pump2State === 1 ? '<span style="color:#2e7d32;font-weight:bold;">🟩 Működik</span>' : (item.pump2State === 2 ? '<span style="color:#c62828;font-weight:bold;">🟥 Rossz</span>' : '<span style="color:gray;">⬜ Nincs</span>');
+    displayList.forEach((item) => {
+        const p1StatusBadge = item.pump1State === 1
+            ? '<span style="background: #e6f4ea; color: #137333; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Üzemel</span>'
+            : (item.pump1State === 2
+                ? '<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Hibás</span>'
+                : '<span style="background: #f1f5f9; color: #64748b; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>');
 
-        const p1Details = [item.pump1Type, item.pump1Serial ? 'SN: ' + item.pump1Serial : ''].filter(Boolean).join(' - ');
-        const p2Details = [item.pump2Type, item.pump2Serial ? 'SN: ' + item.pump2Serial : ''].filter(Boolean).join(' - ');
+        const p2StatusBadge = item.pump2State === 1
+            ? '<span style="background: #e6f4ea; color: #137333; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Üzemel</span>'
+            : (item.pump2State === 2
+                ? '<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Hibás</span>'
+                : '<span style="background: #f1f5f9; color: #64748b; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>');
+
+        const p1Details = [item.pump1Type, item.pump1Serial].filter(Boolean).join(' - ');
+        const p2Details = [item.pump2Type, item.pump2Serial].filter(Boolean).join(' - ');
 
         const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.title = 'Kattints a sorra a szerkesztéshez!';
+        row.onclick = (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                openPumpVisualView(item.settlementName || '', item.streetName || '');
+            }
+        };
         row.innerHTML = `
-            <td><strong>${item.dateString}</strong></td>
-            <td><span style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1b5e20;">⚙️ ${item.settlementName || 'Apaj'}</span></td>
+            <td><strong>${item.dateString || '2026. 11. 11.'}</strong></td>
+            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">⚙️ ${item.settlementName || 'Apaj'}</span></td>
             <td><strong>${item.streetName || 'Helyszín'}</strong></td>
-            <td>${p1StatusText} ${p1Details ? ' (' + p1Details + ')' : ''}</td>
-            <td>${p2StatusText} ${p2Details ? ' (' + p2Details + ')' : ''}</td>
-            <td><strong style="color: #1b5e20;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>
-            <td style="text-align: center;">
-                <button onclick="openPumpVisualView('${item.settlementName || ''}', '${item.streetName || ''}')" style="background: #e8f5e9; border: 1px solid #2e7d32; color: #1b5e20; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold; margin-right: 4px;" title="Nézet">
-                    📱 App Nézet
-                </button>
-                <button onclick="deletePumpRecordFromWeb('${item.id}')" style="background: #ffebee; border: 1px solid #ef5350; color: #c62828; padding: 5px 10px; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;" title="Törlés">
-                    🗑 Törlés
+            <td>${p1StatusBadge} ${p1Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p1Details + ')</span>' : ''}</td>
+            <td>${p2StatusBadge} ${p2Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p2Details + ')</span>' : ''}</td>
+            <td><strong style="color: #0077b6;">👤 ${item.userName || 'Rendszer'}</strong></td>
+            <td style="text-align: center; white-space: nowrap;">
+                <button onclick="deletePumpRecordFromWeb('${item.id}')" class="btn-icon-delete" title="Törlés">
+                    🗑
                 </button>
             </td>
         `;
@@ -906,6 +1148,7 @@ function initDashboard() {
                         dateString: data.dateString || "",
                         timestamp: Number(data.timestamp) || 0,
                         dayKwh: Number(data.dayKwh) || 0,
+                        prevDayKwh: (data.prevDayKwh !== undefined && data.prevDayKwh !== null) ? Number(data.prevDayKwh) : null,
                         userEmail: rawEmail,
                         userName: displayName,
                         note: data.note || ""
@@ -1012,61 +1255,154 @@ function initDashboard() {
     }
 }
 
+function normalizeStreetName(str) {
+    if (!str) return '';
+    return str.toString()
+        .trim()
+        .toLowerCase()
+        .replace(/_/g, ' ')
+        .replace(/\./g, '')
+        .replace(/\s+/g, ' ');
+}
+
 function renderTable() {
     const tbody = document.getElementById('readingsTableBody');
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
+    const searchQuery = document.getElementById('electricitySearch') ? document.getElementById('electricitySearch').value.trim().toLowerCase() : '';
+    const pageSizeVal = document.getElementById('electricityPageSize') ? document.getElementById('electricityPageSize').value : 'ALL';
+
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    const filtered = plantFilter === 'ALL'
-        ? electricityReadings
-        : electricityReadings.filter(r => (r.settlementName || '').trim().toLowerCase() === plantFilter.trim().toLowerCase());
+    const townsToInclude = plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter];
+    let allElecRows = [];
 
-    const sortedAsc = [...filtered].sort((a, b) => {
-        if (a.dateString !== b.dateString) {
-            return a.dateString.localeCompare(b.dateString);
-        }
-        return (a.timestamp || 0) - (b.timestamp || 0);
+    // Monthly rollover cycle check (5th of the month)
+    const now = new Date();
+    const currentDay = now.getDate();
+    const isNewCycle = currentDay >= 5;
+
+    townsToInclude.forEach(town => {
+        const streets = streetMapData[town] || [];
+        streets.forEach(street => {
+            const normTown = normalizeStreetName(town);
+            const normStreet = normalizeStreetName(street);
+
+            const sameMeterReadings = electricityReadings.filter(r =>
+                normalizeStreetName(r.settlementName) === normTown &&
+                normalizeStreetName(r.meterName) === normStreet
+            ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+            const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+            const fixedDoc = sameMeterReadings.find(r => r.id === fixedDocId);
+            const latestReading = fixedDoc || (sameMeterReadings.length > 0 ? sameMeterReadings[0] : null);
+
+            const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
+
+            let prevKwhText = '-';
+            let currKwhText = '-';
+            let diffBadge = '<span style="color:#94a3b8;">-</span>';
+            let dateStr = '2026. 11. 11.';
+            let uploaderName = 'Rendszer';
+            let noteText = '-';
+            let docId = fixedDocId;
+
+            if (latestReading) {
+                dateStr = latestReading.dateString || '2026. 11. 11.';
+                noteText = latestReading.note || noteText;
+                docId = latestReading.id;
+
+                const mostRecentDoc = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
+                if (mostRecentDoc && mostRecentDoc.userName && mostRecentDoc.userName.trim() !== '') {
+                    uploaderName = mostRecentDoc.userName;
+                } else if (latestReading.userName) {
+                    uploaderName = latestReading.userName;
+                }
+
+                if (latestReading.dayKwh > 0) {
+                    currKwhText = `${Math.round(latestReading.dayKwh)} kWh`;
+
+                    const baselinePrev = (latestReading.prevDayKwh && latestReading.prevDayKwh > 0) ? latestReading.prevDayKwh : ((previousReading && previousReading.dayKwh > 0) ? previousReading.dayKwh : null);
+
+                    if (baselinePrev !== null && baselinePrev > 0) {
+                        prevKwhText = `${Math.round(baselinePrev)} kWh`;
+                        const diff = latestReading.dayKwh - baselinePrev;
+                        if (diff >= 0) {
+                            diffBadge = `<span style="background: #dcfce7; color: #15803d; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block;">▲ +${Math.round(diff)} kWh</span>`;
+                        } else {
+                            diffBadge = `<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block;">▼ ${Math.round(diff)} kWh</span>`;
+                        }
+                    }
+                } else if (latestReading.prevDayKwh && latestReading.prevDayKwh > 0) {
+                    prevKwhText = `${Math.round(latestReading.prevDayKwh)} kWh`;
+                }
+            }
+
+            allElecRows.push({
+                id: docId,
+                settlementName: town,
+                meterName: street,
+                dateString: dateStr,
+                prevKwhText: prevKwhText,
+                currKwhText: currKwhText,
+                diffBadge: diffBadge,
+                userName: uploaderName,
+                note: noteText
+            });
+        });
     });
-    const sortedDesc = [...sortedAsc].reverse();
 
-    const countElem = document.getElementById('totalReadingsCount');
-    const uploaderElem = document.getElementById('latestUploader');
-    const dateElem = document.getElementById('latestDate');
-
-    if (countElem) countElem.innerText = `${filtered.length} db`;
-
-    if (sortedDesc.length > 0) {
-        const latest = sortedDesc[0];
-        if (uploaderElem) uploaderElem.innerText = latest.userName || 'Mizsei Márk';
-        if (dateElem) dateElem.innerText = `Legutóbbi: ${latest.dateString || ''}`;
+    if (searchQuery) {
+        allElecRows = allElecRows.filter(r =>
+            (r.settlementName || '').toLowerCase().includes(searchQuery) ||
+            (r.meterName || '').toLowerCase().includes(searchQuery) ||
+            (r.userName || '').toLowerCase().includes(searchQuery) ||
+            (r.prevKwhText || '').toLowerCase().includes(searchQuery) ||
+            (r.currKwhText || '').toLowerCase().includes(searchQuery) ||
+            (r.dateString || '').toLowerCase().includes(searchQuery) ||
+            (r.note || '').toLowerCase().includes(searchQuery)
+        );
     }
 
-    sortedDesc.forEach((item) => {
-        const sameMeterReadings = sortedAsc.filter(r =>
-            (r.settlementName || '').trim().toLowerCase() === (item.settlementName || '').trim().toLowerCase() &&
-            (r.meterName || '').trim().toLowerCase() === (item.meterName || '').trim().toLowerCase()
-        );
-        const itemIdx = sameMeterReadings.findIndex(r => r.id === item.id);
-        const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
+    const totalCount = allElecRows.length;
+    const summaryCountEl = document.getElementById('electricitySummaryCount');
+    if (summaryCountEl) {
+        summaryCountEl.textContent = `Összesen: ${totalCount} bejegyzés`;
+    }
 
-        const diffKwh = prev ? (item.dayKwh - prev.dayKwh) : null;
-        const diffText = diffKwh !== null ? (diffKwh >= 0 ? '+' + diffKwh.toFixed(0) : diffKwh.toFixed(0)) : '-';
-        const isPos = diffKwh === null || diffKwh >= 0;
+    let displayList = allElecRows;
+    if (pageSizeVal !== 'ALL') {
+        const size = parseInt(pageSizeVal, 10) || 50;
+        displayList = allElecRows.slice(0, size);
+    }
 
+    if (displayList.length === 0) {
         const row = document.createElement('tr');
+        row.innerHTML = `<td colspan="9" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Még nincs rögzített leolvasási adat ehhez a szűréshez.</td>`;
+        tbody.appendChild(row);
+        return;
+    }
+
+    displayList.forEach((item) => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.title = 'Kattints a sorra a szerkesztéshez!';
+        row.onclick = (e) => {
+            if (e.target.tagName !== 'BUTTON') {
+                openEditModal(item.id);
+            }
+        };
         row.innerHTML = `
             <td><strong>${item.dateString}</strong></td>
-            <td><span style="background: #e8f5e9; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #1b5e20;">⚡ ${item.settlementName || 'Apaj'}</span></td>
-            <td><strong>${item.meterName || 'Helyszín'}</strong></td>
-            <td style="font-size: 15px; font-weight: bold; color: #1565c0;">${item.dayKwh} kWh</td>
-            <td><span style="background: ${isPos ? '#fff3e0' : '#ffebee'}; color: ${isPos ? '#e65100' : '#c62828'}; padding: 3px 8px; border-radius: 4px; font-weight: bold;">${diffText}</span></td>
-            <td><strong style="color: #1b5e20;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>
-            <td>${item.note || '-'}</td>
+            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">⚡ ${item.settlementName}</span></td>
+            <td><strong>${item.meterName}</strong></td>
+            <td><span style="color: #64748b; font-size: 14px; font-weight: 600;">${item.prevKwhText}</span></td>
+            <td><strong style="color: #0f172a; font-size: 15px;">${item.currKwhText}</strong></td>
+            <td>${item.diffBadge}</td>
+            <td><strong style="color: #0077b6;">👤 ${item.userName}</strong></td>
+            <td>${item.note}</td>
             <td style="text-align: center; white-space: nowrap;">
-                <button onclick="openEditModal('${item.id}')" class="btn-icon-edit" title="Szerkesztés">
-                    ✏️
-                </button>
+                <button onclick="openHistoryModal('${item.settlementName}', '${item.meterName}')" class="btn-icon-history" title="Előzmények megtekintése" style="background: #e0f2fe; color: #0284c7; border: 1px solid #bae6fd; border-radius: 6px; padding: 4px 8px; font-size: 14px; cursor: pointer; margin-right: 6px;">📜</button>
                 <button onclick="deleteReadingFromWeb('${item.id}')" class="btn-icon-delete" title="Törlés">
                     🗑
                 </button>
@@ -1074,6 +1410,666 @@ function renderTable() {
         `;
         tbody.appendChild(row);
     });
+}
+
+// Add Custom Street Modal functions
+function openAddCustomStreetModal() {
+    const townSelect = document.getElementById('customTownSelect');
+    if (townSelect) townSelect.value = 'Apaj';
+
+    const townInput = document.getElementById('customTownInput');
+    if (townInput) {
+        townInput.value = '';
+        townInput.style.display = 'none';
+    }
+
+    const streetInput = document.getElementById('customStreetNameInput');
+    if (streetInput) streetInput.value = '';
+
+    const modal = document.getElementById('addCustomStreetModal');
+    if (modal) {
+        modal.style.display = 'flex';
+    }
+}
+
+function closeAddCustomStreetModal() {
+    const modal = document.getElementById('addCustomStreetModal');
+    if (modal) {
+        modal.style.display = 'none';
+    }
+}
+
+function openDeleteCustomStreetModal() {
+    updateDeleteCustomStreetDropdown();
+    const modal = document.getElementById('deleteCustomStreetModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeDeleteCustomStreetModal() {
+    const modal = document.getElementById('deleteCustomStreetModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function updateDeleteCustomStreetDropdown() {
+    const town = document.getElementById('deleteCustomTownSelect') ? document.getElementById('deleteCustomTownSelect').value : 'Apaj';
+    const streetSelect = document.getElementById('deleteCustomStreetSelect');
+    if (!streetSelect) return;
+    streetSelect.innerHTML = '';
+
+    const defaultStreets = streetMapData[town] || [];
+    const customFromPumps = pumpRecords.filter(r => (r.settlementName || '').trim().toLowerCase() === town.trim().toLowerCase()).map(r => r.streetName);
+    const customFromElec = electricityReadings.filter(r => (r.settlementName || '').trim().toLowerCase() === town.trim().toLowerCase()).map(r => r.meterName);
+    const customFromClean = cleaningRecords.filter(r => (r.settlementName || '').trim().toLowerCase() === town.trim().toLowerCase()).map(r => r.streetName);
+
+    const allStreets = [...defaultStreets, ...customFromPumps, ...customFromElec, ...customFromClean]
+        .filter(Boolean)
+        .filter((v, i, a) => a.findIndex(t => t.toLowerCase() === v.toLowerCase()) === i);
+
+    if (allStreets.length === 0) {
+        const opt = document.createElement('option');
+        opt.value = '';
+        opt.textContent = 'Nincs törölhető utca';
+        streetSelect.appendChild(opt);
+        return;
+    }
+
+    allStreets.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st;
+        opt.textContent = st;
+        streetSelect.appendChild(opt);
+    });
+}
+
+function executeDeleteCustomStreetFromWeb() {
+    const townSelect = document.getElementById('deleteCustomTownSelect');
+    const town = townSelect ? townSelect.value : 'Apaj';
+    const streetSelect = document.getElementById('deleteCustomStreetSelect');
+    const street = streetSelect ? streetSelect.value : '';
+
+    if (!street) {
+        alert("Nincs kiválasztva törlendő utca!");
+        return;
+    }
+
+    if (confirm(`Biztosan törölni szeretnéd a(z) "${street}" átemelőt (${town}) mind az appból, mind a weboldalról?`)) {
+        if (streetMapData[town]) {
+            streetMapData[town] = streetMapData[town].filter(s => s.toLowerCase() !== street.toLowerCase());
+        }
+
+        electricityReadings = electricityReadings.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.meterName || '').toLowerCase() === street.toLowerCase() ));
+        cleaningRecords = cleaningRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
+        pumpRecords = pumpRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
+
+        const docId = `${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                db.collection("custom_streets").doc(docId).delete().then(() => {
+                    console.log("Custom street deleted from Firestore:", docId);
+                }).catch(e => console.error("Error deleting custom street:", e));
+
+                db.collection("pump_records").doc(docId).delete();
+                db.collection("electricity_readings").where("settlementName", "==", town).where("meterName", "==", street).get().then(snapshot => {
+                    snapshot.forEach(doc => doc.ref.delete());
+                });
+                db.collection("cleaning_records").where("settlementName", "==", town).where("streetName", "==", street).get().then(snapshot => {
+                    snapshot.forEach(doc => doc.ref.delete());
+                });
+            } catch (e) {
+                console.error("Firebase delete error:", e);
+            }
+        }
+
+        updateAddElecStreetDropdown();
+        updateAddCleanStreetDropdown();
+        updateAddPumpStreetDropdown();
+        updateDeleteCustomStreetDropdown();
+        renderTable();
+        renderCleaningTable();
+        renderPumpTable();
+
+        alert(`A(z) "${street}" átemelő (${town}) véglegesen törölve lett a weboldalról és az Android applikációból is!`);
+        closeDeleteCustomStreetModal();
+    }
+}
+
+function toggleCustomTownInput() {
+    const townSelect = document.getElementById('customTownSelect');
+    const inputEl = document.getElementById('customTownInput');
+    if (townSelect && inputEl) {
+        inputEl.style.display = townSelect.value === 'NEW_TOWN' ? 'block' : 'none';
+    }
+}
+
+function saveCustomStreetFromWeb() {
+    const townSelect = document.getElementById('customTownSelect');
+    let settlement = townSelect ? townSelect.value : 'Apaj';
+    if (settlement === 'NEW_TOWN') {
+        const customTownInput = document.getElementById('customTownInput');
+        settlement = customTownInput ? customTownInput.value.trim() : '';
+        if (!settlement) {
+            alert("Kérjük írd be az új település nevét!");
+            return;
+        }
+    }
+
+    const streetName = document.getElementById('customStreetNameInput') ? document.getElementById('customStreetNameInput').value.trim() : '';
+
+    if (!streetName) {
+        alert("Kérjük írd be az új átemelő utca nevét!");
+        return;
+    }
+
+    if (!streetMapData[settlement]) {
+        streetMapData[settlement] = [];
+    }
+    if (!streetMapData[settlement].includes(streetName)) {
+        streetMapData[settlement].push(streetName);
+    }
+
+    const docId = `${settlement}_${streetName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+
+    const customStreetPayload = {
+        settlementName: settlement,
+        streetName: streetName,
+        timestamp: Date.now()
+    };
+
+    const pumpPayload = {
+        id: docId,
+        settlementName: settlement,
+        streetName: streetName,
+        pump1State: 0,
+        pump1Type: "",
+        pump1Serial: "",
+        pump2State: 0,
+        pump2Type: "",
+        pump2Serial: "",
+        dateString: dateStr,
+        userEmail: "bviz@bviz.hu",
+        userName: "Vezetői Weboldal",
+        timestamp: Date.now()
+    };
+
+    const idxP = pumpRecords.findIndex(r => r.id === docId);
+    if (idxP >= 0) {
+        pumpRecords[idxP] = pumpPayload;
+    } else {
+        pumpRecords.unshift(pumpPayload);
+    }
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("custom_streets").doc(docId).set(customStreetPayload, { merge: true });
+            db.collection("pump_records").doc(docId).set(pumpPayload, { merge: true });
+        } catch (e) {
+            console.error("Firebase custom street save error:", e);
+        }
+    }
+
+    updateAddElecStreetDropdown();
+    updateAddCleanStreetDropdown();
+    updateAddPumpStreetDropdown();
+    renderTable();
+    renderCleaningTable();
+    renderPumpTable();
+
+    alert(`A(z) "${streetName}" átemelő (${settlement}) sikeresen létrehozva és szinkronizálva!`);
+    closeAddCustomStreetModal();
+}
+
+// Dropdown street updates
+function updateAddElecStreetDropdown() {
+    const settlement = document.getElementById('addElecSettlement') ? document.getElementById('addElecSettlement').value : 'Apaj';
+    const streetSelect = document.getElementById('addElecStreet');
+    if (!streetSelect) return;
+    streetSelect.innerHTML = '';
+    const defaultStreets = streetMapData[settlement] || ["1. sz. Helyszín", "2. sz. Helyszín"];
+    const customFromElec = electricityReadings.filter(r => (r.settlementName || '').trim().toLowerCase() === settlement.trim().toLowerCase()).map(r => r.meterName);
+    const allStreets = [...defaultStreets, ...customFromElec].filter(Boolean).filter((v, i, a) => a.findIndex(t => t.toLowerCase() === v.toLowerCase()) === i);
+
+    allStreets.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st;
+        opt.textContent = st;
+        streetSelect.appendChild(opt);
+    });
+}
+
+function updateAddCleanStreetDropdown() {
+    const settlement = document.getElementById('addCleanSettlement') ? document.getElementById('addCleanSettlement').value : 'Apaj';
+    const streetSelect = document.getElementById('addCleanStreet');
+    if (!streetSelect) return;
+    streetSelect.innerHTML = '';
+    const defaultStreets = streetMapData[settlement] || ["1. sz. Helyszín", "2. sz. Helyszín"];
+    const customFromClean = cleaningRecords.filter(r => (r.settlementName || '').trim().toLowerCase() === settlement.trim().toLowerCase()).map(r => r.streetName);
+    const allStreets = [...defaultStreets, ...customFromClean].filter(Boolean).filter((v, i, a) => a.findIndex(t => t.toLowerCase() === v.toLowerCase()) === i);
+
+    allStreets.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st;
+        opt.textContent = st;
+        streetSelect.appendChild(opt);
+    });
+}
+
+function updateAddPumpStreetDropdown() {
+    const settlement = document.getElementById('addPumpSettlement') ? document.getElementById('addPumpSettlement').value : 'Apaj';
+    const streetSelect = document.getElementById('addPumpStreet');
+    if (!streetSelect) return;
+    streetSelect.innerHTML = '';
+    const defaultStreets = streetMapData[settlement] || ["1. sz. Helyszín", "2. sz. Helyszín"];
+    const customFromPumps = pumpRecords.filter(r => (r.settlementName || '').trim().toLowerCase() === settlement.trim().toLowerCase()).map(r => r.streetName);
+    const allStreets = [...defaultStreets, ...customFromPumps].filter(Boolean).filter((v, i, a) => a.findIndex(t => t.toLowerCase() === v.toLowerCase()) === i);
+
+    allStreets.forEach(st => {
+        const opt = document.createElement('option');
+        opt.value = st;
+        opt.textContent = st;
+        streetSelect.appendChild(opt);
+    });
+}
+
+// 1. Add Electricity Modal
+function openAddElectricityModal() {
+    updateAddElecStreetDropdown();
+    const dateEl = document.getElementById('addElecDateString');
+    if (dateEl) {
+        dateEl.value = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+    }
+    const modal = document.getElementById('addElectricityModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAddElectricityModal() {
+    const modal = document.getElementById('addElectricityModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveNewElectricityFromWeb() {
+    const settlement = document.getElementById('addElecSettlement').value;
+    const streetSelect = document.getElementById('addElecStreet');
+    let street = streetSelect ? streetSelect.value : '';
+    if (street === 'NEW_STREET') {
+        const customEl = document.getElementById('addElecNewStreetInput');
+        street = customEl ? customEl.value.trim() : '';
+        if (street.length === 0) {
+            alert("Kérjük írd be az új utca/átemelő nevét!");
+            return;
+        }
+        if (!streetMapData[settlement]) streetMapData[settlement] = [];
+        if (!streetMapData[settlement].includes(street)) streetMapData[settlement].push(street);
+    }
+    const dayKwh = Number(document.getElementById('addElecDayKwh').value);
+    const dateString = document.getElementById('addElecDateString').value.trim();
+    const userName = document.getElementById('addElecUserName').value.trim() || 'Vezetői Weboldal';
+
+    if (isNaN(dayKwh) || dayKwh < 0) {
+        alert("Kérjük adj meg egy érvényes leolvasott óraállást!");
+        return;
+    }
+
+    const newDocId = `web_${Date.now()}`;
+    const newRecord = {
+        id: newDocId,
+        settlementName: settlement,
+        meterName: street,
+        dayKwh: dayKwh,
+        dateString: dateString,
+        userEmail: 'bviz@bviz.hu',
+        userName: userName,
+        note: '',
+        timestamp: Date.now()
+    };
+
+    electricityReadings.unshift(newRecord);
+    renderTable();
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("electricity_readings").add({
+                settlementName: settlement,
+                meterName: street,
+                dayKwh: dayKwh,
+                dateString: dateString,
+                userEmail: 'bviz@bviz.hu',
+                userName: userName,
+                note: '',
+                timestamp: Date.now()
+            }).then(() => console.log("Új villanyóra leolvasás elmentve Firestore-ba!"))
+            .catch(e => console.error("Hiba az új leolvasás mentésénél:", e));
+        } catch (e) {
+            console.error("Firebase save error:", e);
+        }
+    }
+
+    closeAddElectricityModal();
+}
+
+// 2. Add Cleaning Modal
+function openAddCleaningModal() {
+    updateAddCleanStreetDropdown();
+    const dateEl = document.getElementById('addCleanDateString');
+    if (dateEl) {
+        dateEl.value = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+    }
+    const modal = document.getElementById('addCleaningModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAddCleaningModal() {
+    const modal = document.getElementById('addCleaningModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveNewCleaningFromWeb() {
+    const settlement = document.getElementById('addCleanSettlement').value;
+    const streetSelect = document.getElementById('addCleanStreet');
+    let street = streetSelect ? streetSelect.value : '';
+    if (street === 'NEW_STREET') {
+        const customEl = document.getElementById('addCleanNewStreetInput');
+        street = customEl ? customEl.value.trim() : '';
+        if (street.length === 0) {
+            alert("Kérjük írd be az új utca/átemelő nevét!");
+            return;
+        }
+        if (!streetMapData[settlement]) streetMapData[settlement] = [];
+        if (!streetMapData[settlement].includes(street)) streetMapData[settlement].push(street);
+    }
+    const dateString = document.getElementById('addCleanDateString').value.trim();
+    const userName = document.getElementById('addCleanUserName').value.trim() || 'Vezetői Weboldal';
+    const note = document.getElementById('addCleanNote') ? document.getElementById('addCleanNote').value.trim() : '';
+
+    const newDocId = `web_clean_${Date.now()}`;
+    const newRecord = {
+        id: newDocId,
+        settlementName: settlement,
+        streetName: street,
+        dateString: dateString,
+        userEmail: 'bviz@bviz.hu',
+        userName: userName,
+        note: note,
+        timestamp: Date.now()
+    };
+
+    cleaningRecords.unshift(newRecord);
+    renderCleaningTable();
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("cleaning_records").add({
+                settlementName: settlement,
+                streetName: street,
+                dateString: dateString,
+                userEmail: 'bviz@bviz.hu',
+                userName: userName,
+                note: note,
+                timestamp: Date.now()
+            }).then(() => console.log("Új takarítási adat elmentve Firestore-ba!"))
+            .catch(e => console.error("Hiba az új takarítás mentésénél:", e));
+        } catch (e) {
+            console.error("Firebase save error:", e);
+        }
+    }
+
+    closeAddCleaningModal();
+}
+
+// 3. Add Pump Modal
+function openAddPumpModal() {
+    updateAddPumpStreetDropdown();
+    const modal = document.getElementById('addPumpModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAddPumpModal() {
+    const modal = document.getElementById('addPumpModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveNewPumpFromWeb() {
+    const settlement = document.getElementById('addPumpSettlement').value;
+    const streetSelect = document.getElementById('addPumpStreet');
+    let street = streetSelect ? streetSelect.value : '';
+    if (street === 'NEW_STREET') {
+        const customEl = document.getElementById('addPumpNewStreetInput');
+        street = customEl ? customEl.value.trim() : '';
+        if (street.length === 0) {
+            alert("Kérjük írd be az új utca/átemelő nevét!");
+            return;
+        }
+        if (!streetMapData[settlement]) streetMapData[settlement] = [];
+        if (!streetMapData[settlement].includes(street)) streetMapData[settlement].push(street);
+    }
+    const p1State = Number(document.getElementById('addPumpP1State').value || 0);
+    const p1Type = document.getElementById('addPumpP1Type') ? document.getElementById('addPumpP1Type').value.trim() : '';
+    const p1Serial = document.getElementById('addPumpP1Serial') ? document.getElementById('addPumpP1Serial').value.trim() : '';
+
+    const p2State = Number(document.getElementById('addPumpP2State').value || 0);
+    const p2Type = document.getElementById('addPumpP2Type') ? document.getElementById('addPumpP2Type').value.trim() : '';
+    const p2Serial = document.getElementById('addPumpP2Serial') ? document.getElementById('addPumpP2Serial').value.trim() : '';
+
+    const docId = `${settlement}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+
+    const payload = {
+        id: docId,
+        settlementName: settlement,
+        streetName: street,
+        pump1State: p1State,
+        pump1Type: p1Type,
+        pump1Serial: p1Serial,
+        pump1RemoveDate: "",
+        pump1Pos: 1,
+        pump2State: p2State,
+        pump2Type: p2Type,
+        pump2Serial: p2Serial,
+        pump2RemoveDate: "",
+        pump2Pos: 2,
+        dateString: dateStr,
+        userEmail: "bviz@bviz.hu",
+        userName: "Vezetői Weboldal",
+        timestamp: Date.now()
+    };
+
+    const idx = pumpRecords.findIndex(r => r.id === docId);
+    if (idx >= 0) {
+        pumpRecords[idx] = payload;
+    } else {
+        pumpRecords.unshift(payload);
+    }
+
+    renderPumpTable();
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("pump_records").doc(docId).set(payload, { merge: true })
+                .then(() => console.log("Új szivattyú adat elmentve Firestore-ba!"))
+                .catch(e => console.error("Hiba az új szivattyú adat mentésénél:", e));
+        } catch (e) {
+            console.error("Firebase save error:", e);
+        }
+    }
+
+    closeAddPumpModal();
+}
+
+function openHistoryModal(town, street) {
+    const subtitleEl = document.getElementById('historyModalSubtitle');
+    const tbody = document.getElementById('historyModalTableBody');
+    if (subtitleEl) subtitleEl.textContent = `${town} • ${street}`;
+    if (tbody) tbody.innerHTML = '';
+
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
+
+    const rawList = electricityReadings.filter(r =>
+        normalizeStreetName(r.settlementName) === normTown &&
+        normalizeStreetName(r.meterName) === normStreet &&
+        r.dayKwh > 0
+    ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    // Deduplicate history records by dayKwh + dateString so identical numbers on the same date never multiply
+    const historyList = [];
+    const seenKeys = new Set();
+
+    rawList.forEach(item => {
+        const key = `${Math.round(item.dayKwh)}_${item.dateString}`;
+        if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            historyList.push(item);
+        }
+    });
+
+    if (historyList.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td colspan="5" style="text-align: center; color: #64748b; padding: 16px;">Még nincs elmentett előzmény adat ehhez az utcához.</td>`;
+        tbody.appendChild(tr);
+    } else {
+        historyList.forEach(item => {
+            const tr = document.createElement('tr');
+            tr.style.cursor = 'pointer';
+            tr.title = 'Duplán kattintva szerkesztheted ezt a korábbi leolvasást!';
+            tr.ondblclick = () => {
+                openEditHistoryRecordModal(item.id, item.dateString, item.dayKwh, item.userName, item.note, town, street);
+            };
+            tr.innerHTML = `
+                <td style="padding: 10px; font-weight: bold;">${item.dateString || '2026. 11. 11.'}</td>
+                <td style="padding: 10px; font-weight: bold; color: #1565c0;">${item.dayKwh > 0 ? Math.round(item.dayKwh) + ' kWh' : '-'}</td>
+                <td style="padding: 10px; font-weight: bold; color: #0077b6;">👤 ${item.userName || 'Rendszer'}</td>
+                <td style="padding: 10px; color: #475569;">${item.note || '-'}</td>
+                <td style="padding: 10px; text-align: center;">
+                    <button class="btn-delete-hist" title="Törlés" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; font-weight: bold;">🗑 Törlés</button>
+                </td>
+            `;
+
+            const delBtn = tr.querySelector('.btn-delete-hist');
+            if (delBtn) {
+                delBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    deleteSingleHistoryRecord(item.id, town, street);
+                };
+            }
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    const modal = document.getElementById('historyModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function deleteSingleHistoryRecord(recordId, town, street) {
+    if (confirm("Biztosan törölni szeretnéd ezt a konkrét leolvasási sort az előzményekből?")) {
+        // Delete ONLY the specific clicked record ID from local memory!
+        electricityReadings = electricityReadings.filter(r => r.id !== recordId);
+
+        // Delete ONLY this specific document ID from Cloud Firestore
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                db.collection("electricity_readings").doc(recordId).delete()
+                    .then(() => console.log("Sikeresen törölve a konkrét előzmény elem:", recordId))
+                    .catch(e => console.error("Hiba a törlésnél:", e));
+            } catch (e) {
+                console.error("Firebase error:", e);
+            }
+        }
+
+        // Re-render open history modal and main table
+        setTimeout(() => {
+            openHistoryModal(town, street);
+            renderTable();
+        }, 150);
+    }
+}
+
+function openEditHistoryRecordModal(recordId, dateStr, kwh, userName, note, town, street) {
+    document.getElementById('editHistoryRecordId').value = recordId;
+    document.getElementById('editHistoryTown').value = town;
+    document.getElementById('editHistoryStreet').value = street;
+    document.getElementById('editHistoryKwh').value = kwh ? Math.round(kwh) : '';
+    document.getElementById('editHistoryDateString').value = dateStr || '2026. 11. 11.';
+    document.getElementById('editHistoryUserName').value = userName || 'Vezetői Weboldal';
+    const noteEl = document.getElementById('editHistoryNote');
+    if (noteEl) noteEl.value = note || '';
+
+    const modal = document.getElementById('editHistoryRecordModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeEditHistoryRecordModal() {
+    const modal = document.getElementById('editHistoryRecordModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveEditHistoryRecordFromWeb() {
+    const recordId = document.getElementById('editHistoryRecordId').value;
+    const town = document.getElementById('editHistoryTown').value;
+    const street = document.getElementById('editHistoryStreet').value;
+    const kwhVal = document.getElementById('editHistoryKwh').value.trim();
+    const dateStr = document.getElementById('editHistoryDateString').value.trim();
+    const userName = document.getElementById('editHistoryUserName').value.trim() || 'Vezetői Weboldal';
+    const noteText = document.getElementById('editHistoryNote') ? document.getElementById('editHistoryNote').value.trim() : '';
+
+    const newKwh = kwhVal !== '' ? Number(kwhVal) : 0;
+
+    const idx = electricityReadings.findIndex(r => r.id === recordId);
+    if (idx >= 0) {
+        electricityReadings[idx].dayKwh = newKwh;
+        electricityReadings[idx].dateString = dateStr;
+        electricityReadings[idx].userName = userName;
+        electricityReadings[idx].note = noteText;
+        electricityReadings[idx].timestamp = Date.now();
+    }
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("electricity_readings").doc(recordId).update({
+                dayKwh: newKwh,
+                dateString: dateStr,
+                userName: userName,
+                note: noteText,
+                timestamp: Date.now()
+            }).then(() => console.log("Korábbi előzmény mérés elmentve:", recordId));
+        } catch (e) {}
+    }
+
+    closeEditHistoryRecordModal();
+    openHistoryModal(town, street);
+    renderTable();
+}
+
+function deleteSingleHistoryRecord(recordId, town, street) {
+    if (confirm("Biztosan törölni szeretnéd ezt a korábbi mérést az előzményekből?")) {
+        electricityReadings = electricityReadings.filter(r => r.id !== recordId);
+        openHistoryModal(town, street);
+        renderTable();
+
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                db.collection("electricity_readings").doc(recordId).delete()
+                    .then(() => console.log("Sikeresen törölve az előzményekből:", recordId))
+                    .catch(e => console.error("Hiba az előzmény törlésénél:", e));
+            } catch (e) {
+                console.error("Firebase error:", e);
+            }
+        }
+    }
+}
+
+function closeHistoryModal() {
+    const modal = document.getElementById('historyModal');
+    if (modal) modal.style.display = 'none';
 }
 
 document.addEventListener('DOMContentLoaded', checkWebSession);

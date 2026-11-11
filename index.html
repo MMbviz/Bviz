@@ -66,7 +66,7 @@
         <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 100%; max-width: 440px; text-align: center; border-top: 6px solid #1b5e20;">
             <img src="bviz_logo.jpg" alt="Bviz Logo" style="height: 130px; border-radius: 22px; margin-bottom: 14px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));">
             <p style="color: #1b5e20; font-size: 18px; font-weight: bold; margin-bottom: 24px;">Vezetői irányítópult</p>
-            <form id="loginForm" onsubmit="handleWebLogin(event)">
+            <form id="loginForm" onsubmit="handleWebLogin(event); return false;">
                 <div style="margin-bottom: 16px; text-align: left;">
                     <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
                     <input type="text" id="webUsername" placeholder="Felhasználónév" required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
@@ -76,7 +76,7 @@
                     <input type="password" id="webPassword" placeholder="Jelszó" required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás felhasználónév vagy jelszó!</div>
-                <button type="submit" style="width: 100%; background: linear-gradient(135deg, #1b5e20, #2e7d32); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(27,94,32,0.3);">Bejelentkezés</button>
+                <button type="button" onclick="handleWebLogin(event)" style="width: 100%; background: linear-gradient(135deg, #1b5e20, #2e7d32); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(27,94,32,0.3);">Bejelentkezés</button>
             </form>
         </div>
     </div>
@@ -120,10 +120,19 @@
         <!-- SECTION 1: Electricity Meter Readings -->
         <div id="electricitySection">
             <div class="table-card">
-                <!-- Filter Bar -->
+                <!-- Filter Bar with ➕ Új Leolvasás, ➕ Új átemelő and 🗑 Átemelő törlése buttons -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">⚡ Szennyvíz átemelők villanyóra állása</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            ➕ Új Leolvasás
+                        </button>
+                        <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            ➕ Új átemelő
+                        </button>
+                        <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            🗑 Átemelő törlése
+                        </button>
                         <input type="text" id="electricitySearch" placeholder="🔍 Keresés..." onkeyup="renderTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
                         <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
                             <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
@@ -145,19 +154,20 @@
                     </div>
                 </div>
 
-                <!-- Data Table -->
+                <!-- Data Table with Előző Óraállás column -->
                 <div class="table-wrapper" style="overflow-x: auto;">
                     <table class="data-table" style="width: 100%; table-layout: auto;">
                         <thead>
                             <tr>
-                                <th style="width: 13%;">Leolvasás Dátuma</th>
-                                <th style="width: 12%;">Település</th>
-                                <th style="width: 22%;">Utca</th>
+                                <th style="width: 12%;">Leolvasás Dátuma</th>
+                                <th style="width: 11%;">Település</th>
+                                <th style="width: 18%;">Utca</th>
+                                <th style="width: 11%;">Előző Óraállás</th>
                                 <th style="width: 11%;">Óraállás</th>
-                                <th style="width: 12%;">Különbség</th>
+                                <th style="width: 11%;">Különbség</th>
                                 <th style="width: 12%;">Rögzítő Neve</th>
-                                <th style="width: 10%;">Megjegyzés</th>
-                                <th style="width: 8%; text-align: center;">Műveletek</th>
+                                <th style="width: 9%;">Megjegyzés</th>
+                                <th style="width: 5%; text-align: center;">Műveletek</th>
                             </tr>
                         </thead>
                         <tbody id="readingsTableBody">
@@ -194,6 +204,15 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">🚛 Takarítási Nyilvántartás</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button onclick="openAddCleaningModal()" style="background: #1b5e20; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            ➕ Új Takarítás
+                        </button>
+                        <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            ➕ Új átemelő
+                        </button>
+                        <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            🗑 Átemelő törlése
+                        </button>
                         <input type="text" id="cleaningSearch" placeholder="🔍 Keresés..." onkeyup="renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
                         <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
                             <select id="cleaningPlantFilter" onchange="renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
@@ -262,6 +281,16 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">⚙️ Szivattyú Nyilvántartás & Állapotok</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button onclick="openAddPumpModal()" style="background: #1b5e20; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            ➕ Új Szivattyú Adat
+                        </button>
+                        <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            ➕ Új átemelő
+                        </button>
+                        <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                            🗑 Átemelő törlése
+                        </button>
+                        <input type="text" id="pumpSearch" placeholder="🔍 Keresés..." onkeyup="renderPumpTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
                         <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
                             <select id="pumpPlantFilter" onchange="renderPumpTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
                                 <option value="ALL">Minden Település</option>
@@ -282,37 +311,47 @@
                     </div>
                 </div>
 
-                <!-- Visual Mobile-Style Card Container (When a Street Card is Clicked!) -->
-                <div id="pumpVisualContainer" style="display: none; padding: 20px;">
+                <!-- Visual Mobile-Style Card Container (When Editing) -->
+                <div id="pumpVisualContainer" style="display: none; padding: 20px; border-bottom: 1px solid #e2e8f0; background: #f8fafc;">
                     <!-- Rendered dynamically in app.js -->
                 </div>
 
-                <!-- Interactive Street Cards List for Selected Town -->
-                <div style="padding: 20px;">
-                    <h3 id="pumpStreetTitle" style="color: #1b5e20; margin-bottom: 14px; font-size: 16px; font-weight: bold;">🏙️ Válassz egy utcát az applikációs kártya nézethez:</h3>
-                    <div id="pumpStreetList" style="display: flex; flex-direction: column; gap: 10px; width: 100%; margin-bottom: 24px;">
-                        <!-- Rendered dynamically in app.js -->
-                    </div>
+                <!-- Data Table View -->
+                <div class="table-wrapper" style="overflow-x: auto;">
+                    <table class="data-table" style="width: 100%; table-layout: auto;">
+                        <thead>
+                            <tr>
+                                <th style="width: 12%;">Karbantartás Dátuma</th>
+                                <th style="width: 11%;">Település</th>
+                                <th style="width: 16%;">Utca</th>
+                                <th style="width: 23%;">⚙️ Első Szivattyú</th>
+                                <th style="width: 23%;">⚙️ Második Szivattyú</th>
+                                <th style="width: 10%;">Rögzítő Neve</th>
+                                <th style="width: 5%; text-align: center;">Műveletek</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pumpTableBody">
+                            <!-- Loaded dynamically in app.js -->
+                        </tbody>
+                    </table>
+                </div>
 
-                    <!-- Summary Table View -->
-                    <h3 style="color: #1b5e20; margin-bottom: 12px; font-size: 16px; font-weight: bold;">📋 Összesített Rögzítések Táblázata</h3>
-                    <div class="table-wrapper" style="overflow-x: auto;">
-                        <table class="data-table" style="width: 100%; table-layout: auto;">
-                            <thead>
-                                <tr>
-                                    <th>Rögzítés Dátuma</th>
-                                    <th>Település</th>
-                                    <th>Utca</th>
-                                    <th>1. Szivattyú Állapota & Adatai</th>
-                                    <th>2. Szivattyú Állapota & Adatai</th>
-                                    <th>Rögzítő Neve</th>
-                                    <th style="text-align: center;">Műveletek</th>
-                                </tr>
-                            </thead>
-                            <tbody id="pumpTableBody">
-                                <!-- Loaded dynamically in app.js -->
-                            </tbody>
-                        </table>
+                <!-- Table Footer Pagination Bar -->
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
+                    <span id="pumpSummaryCount" style="color: #64748b; font-size: 13px; font-weight: 500;">Összesen: 0 bejegyzés</span>
+                    <div style="display: flex; gap: 6px; align-items: center;">
+                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Előző</button>
+                        <button style="padding: 6px 12px; border-radius: 6px; border: none; background: #1b5e20; color: #ffffff; font-size: 13px; font-weight: bold; cursor: pointer;">1</button>
+                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Következő</button>
+                    </div>
+                    <div>
+                        <label style="color: #64748b; font-size: 13px; font-weight: 500;">Mutass:
+                            <select id="pumpPageSize" onchange="renderPumpTable()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px;">
+                                <option value="25">25 sor</option>
+                                <option value="50">50 sor</option>
+                                <option value="ALL">Összes</option>
+                            </select>
+                        </label>
                     </div>
                 </div>
             </div>
@@ -325,6 +364,68 @@
         </footer>
     </div>
 
+    <!-- Add Custom Pumping Station Street Modal -->
+    <div id="addCustomStreetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #0077b6;">
+            <h2 style="color: #0077b6; margin-bottom: 16px; font-size: 20px;">🏭 Új Átemelő / Utca Létrehozása</h2>
+            <div style="margin-bottom: 14px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település kiválasztása</label>
+                <select id="customTownSelect" onchange="toggleCustomTownInput()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <option value="Apaj">Apaj</option>
+                    <option value="Kunszentmiklós">Kunszentmiklós</option>
+                    <option value="Apostag">Apostag</option>
+                    <option value="Dunavecse">Dunavecse</option>
+                    <option value="Szabadszállás">Szabadszállás</option>
+                    <option value="Kunadacs">Kunadacs</option>
+                    <option value="Szalkszentmárton">Szalkszentmárton</option>
+                    <option value="Tass">Tass</option>
+                    <option value="Kunpeszér">Kunpeszér</option>
+                    <option value="NEW_TOWN">➕ Új település megadása...</option>
+                </select>
+                <input type="text" id="customTownInput" placeholder="✍️ Írd be az új település nevét..." style="display: none; width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0077b6; font-size: 14px; margin-top: 6px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Új Átemelő / Utca Neve</label>
+                <input type="text" id="customStreetNameInput" placeholder="" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0077b6; font-size: 15px; font-weight: bold; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeAddCustomStreetModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveCustomStreetFromWeb()" style="background: #0077b6; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés & Szinkronizálás ✔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Custom Pumping Station Street Modal -->
+    <div id="deleteCustomStreetModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #e53935;">
+            <h2 style="color: #e53935; margin-bottom: 16px; font-size: 20px;">🗑 Átemelő / Utca Végleges Törlése</h2>
+            <div style="margin-bottom: 14px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település kiválasztása</label>
+                <select id="deleteCustomTownSelect" onchange="updateDeleteCustomStreetDropdown()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <option value="Apaj">Apaj</option>
+                    <option value="Kunszentmiklós">Kunszentmiklós</option>
+                    <option value="Apostag">Apostag</option>
+                    <option value="Dunavecse">Dunavecse</option>
+                    <option value="Szabadszállás">Szabadszállás</option>
+                    <option value="Kunadacs">Kunadacs</option>
+                    <option value="Szalkszentmárton">Szalkszentmárton</option>
+                    <option value="Tass">Tass</option>
+                    <option value="Kunpeszér">Kunpeszér</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Törlendő Átemelő / Utca</label>
+                <select id="deleteCustomStreetSelect" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #e53935; font-size: 15px; font-weight: bold; box-sizing: border-box; background: #fff;">
+                    <!-- Updated via JS -->
+                </select>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeDeleteCustomStreetModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="executeDeleteCustomStreetFromWeb()" style="background: #e53935; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Végleges Törlés 🗑</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Edit Reading Modal -->
     <div id="editModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
         <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #1b5e20;">
@@ -332,11 +433,15 @@
             <input type="hidden" id="editReadingId">
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település</label>
-                <input type="text" id="editSettlement" readonly style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; font-size: 14px; box-sizing: border-box;">
+                <input type="text" id="editSettlement" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
             </div>
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Utca / Helyszín</label>
-                <input type="text" id="editMeterName" readonly style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; font-size: 14px; box-sizing: border-box;">
+                <input type="text" id="editMeterName" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #64748b;">Előző Óraállás (kWh)</label>
+                <input type="number" id="editPrevDayKwh" step="1" placeholder="" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 15px; font-weight: bold; color: #475569; box-sizing: border-box;">
             </div>
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Leolvasott Óraállás (kWh)</label>
@@ -346,13 +451,118 @@
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Leolvasás Dátuma</label>
                 <input type="text" id="editDateString" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
             </div>
-            <div style="margin-bottom: 16px; text-align: left;">
+            <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Rögzítő Neve</label>
                 <input type="text" id="editUserName" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Megjegyzés / Észrevételek</label>
+                <textarea id="editReadingNote" rows="2" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #1b5e20; font-size: 14px; box-sizing: border-box;"></textarea>
             </div>
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                 <button onclick="closeEditModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
                 <button onclick="saveEditFromWeb()" style="background: #1b5e20; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reading History Modal -->
+    <div id="historyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 600px; border-top: 5px solid #0077b6;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+                <h2 style="color: #0077b6; font-size: 20px; margin: 0;">📜 Korábbi Óraállások Előzményei</h2>
+                <button onclick="closeHistoryModal()" style="background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px;">✕ Bezárás</button>
+            </div>
+            <p id="historyModalSubtitle" style="color: #475569; font-size: 14px; margin-top: -8px; margin-bottom: 16px; font-weight: 600;"></p>
+            <div style="max-height: 360px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+                <table class="data-table" style="width: 100%; table-layout: auto;">
+                    <thead>
+                        <tr style="background: #f8fafc;">
+                            <th style="padding: 10px;">Leolvasás Dátuma</th>
+                            <th style="padding: 10px;">Leolvasott Óraállás</th>
+                            <th style="padding: 10px;">Rögzítő Neve</th>
+                            <th style="padding: 10px;">Megjegyzés</th>
+                            <th style="padding: 10px; text-align: center;">Művelet</th>
+                        </tr>
+                    </thead>
+                    <tbody id="historyModalTableBody">
+                        <!-- Loaded dynamically -->
+                    </tbody>
+                </table>
+            </div>
+            <p style="color: #64748b; font-size: 11px; margin-top: 10px; text-align: center; margin-bottom: 0;">💡 Tipp: Duplán kattintva bármelyik sorra átírhatod az adott korábbi leolvasási adatot!</p>
+        </div>
+    </div>
+
+    <!-- Edit Historical Record Modal -->
+    <div id="editHistoryRecordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 10000;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 440px; border-top: 5px solid #0077b6;">
+            <h2 style="color: #0077b6; margin-bottom: 16px; font-size: 20px;">✏️ Korábbi Leolvasás Szerkesztése</h2>
+            <input type="hidden" id="editHistoryRecordId">
+            <input type="hidden" id="editHistoryTown">
+            <input type="hidden" id="editHistoryStreet">
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Leolvasott Óraállás (kWh)</label>
+                <input type="number" id="editHistoryKwh" step="1" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0077b6; font-size: 16px; font-weight: bold; color: #0077b6; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Leolvasás Dátuma</label>
+                <input type="text" id="editHistoryDateString" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Rögzítő Neve</label>
+                <input type="text" id="editHistoryUserName" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Megjegyzés</label>
+                <textarea id="editHistoryNote" rows="2" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #0077b6; font-size: 14px; box-sizing: border-box;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeEditHistoryRecordModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveEditHistoryRecordFromWeb()" style="background: #0077b6; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Electricity Modal -->
+    <div id="addElectricityModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #1b5e20;">
+            <h2 style="color: #1b5e20; margin-bottom: 16px; font-size: 20px;">⚡ Új Villanyóra Leolvasás Rögzítése</h2>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település</label>
+                <select id="addElecSettlement" onchange="updateAddElecStreetDropdown()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <option value="Apaj">Apaj</option>
+                    <option value="Kunszentmiklós">Kunszentmiklós</option>
+                    <option value="Apostag">Apostag</option>
+                    <option value="Dunavecse">Dunavecse</option>
+                    <option value="Szabadszállás">Szabadszállás</option>
+                    <option value="Kunadacs">Kunadacs</option>
+                    <option value="Szalkszentmárton">Szalkszentmárton</option>
+                    <option value="Tass">Tass</option>
+                    <option value="Kunpeszér">Kunpeszér</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Utca / Helyszín</label>
+                <select id="addElecStreet" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <!-- Updated via JS -->
+                </select>
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Leolvasott Óraállás (kWh)</label>
+                <input type="number" id="addElecDayKwh" placeholder="" required style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #1b5e20; font-size: 16px; font-weight: bold; color: #1b5e20; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Leolvasás Dátuma</label>
+                <input type="text" id="addElecDateString" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Rögzítő Neve</label>
+                <input type="text" id="addElecUserName" value="Vezetői Weboldal" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeAddElectricityModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveNewElectricityFromWeb()" style="background: #1b5e20; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés ✔</button>
             </div>
         </div>
     </div>
@@ -364,11 +574,11 @@
             <input type="hidden" id="editCleaningId">
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település</label>
-                <input type="text" id="editCleaningSettlement" readonly style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; font-size: 14px; box-sizing: border-box;">
+                <input type="text" id="editCleaningSettlement" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
             </div>
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Utca / Helyszín</label>
-                <input type="text" id="editCleaningStreet" readonly style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; background: #f5f5f5; font-size: 14px; box-sizing: border-box;">
+                <input type="text" id="editCleaningStreet" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
             </div>
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Takarítás Dátuma</label>
@@ -385,6 +595,102 @@
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                 <button onclick="closeCleaningEditModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
                 <button onclick="saveCleaningEditFromWeb()" style="background: #1b5e20; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Cleaning Modal -->
+    <div id="addCleaningModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #1b5e20;">
+            <h2 style="color: #1b5e20; margin-bottom: 16px; font-size: 20px;">🚛 Új Takarítás Rögzítése</h2>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település</label>
+                <select id="addCleanSettlement" onchange="updateAddCleanStreetDropdown()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <option value="Apaj">Apaj</option>
+                    <option value="Kunszentmiklós">Kunszentmiklós</option>
+                    <option value="Apostag">Apostag</option>
+                    <option value="Dunavecse">Dunavecse</option>
+                    <option value="Szabadszállás">Szabadszállás</option>
+                    <option value="Kunadacs">Kunadacs</option>
+                    <option value="Szalkszentmárton">Szalkszentmárton</option>
+                    <option value="Tass">Tass</option>
+                    <option value="Kunpeszér">Kunpeszér</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Utca / Helyszín</label>
+                <select id="addCleanStreet" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <!-- Updated via JS -->
+                </select>
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Takarítás Dátuma</label>
+                <input type="text" id="addCleanDateString" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Rögzítő Neve</label>
+                <input type="text" id="addCleanUserName" value="Vezetői Weboldal" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Megjegyzés / Észrevételek</label>
+                <textarea id="addCleanNote" rows="3" placeholder="" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #1b5e20; font-size: 14px; box-sizing: border-box;"></textarea>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeAddCleaningModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveNewCleaningFromWeb()" style="background: #1b5e20; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés ✔</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Pump Modal -->
+    <div id="addPumpModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 480px; border-top: 5px solid #1b5e20;">
+            <h2 style="color: #1b5e20; margin-bottom: 16px; font-size: 20px;">⚙️ Új Szivattyú Adat Rögzítése</h2>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település</label>
+                <select id="addPumpSettlement" onchange="updateAddPumpStreetDropdown()" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <option value="Apaj">Apaj</option>
+                    <option value="Kunszentmiklós">Kunszentmiklós</option>
+                    <option value="Apostag">Apostag</option>
+                    <option value="Dunavecse">Dunavecse</option>
+                    <option value="Szabadszállás">Szabadszállás</option>
+                    <option value="Kunadacs">Kunadacs</option>
+                    <option value="Szalkszentmárton">Szalkszentmárton</option>
+                    <option value="Tass">Tass</option>
+                    <option value="Kunpeszér">Kunpeszér</option>
+                </select>
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Utca / Helyszín</label>
+                <select id="addPumpStreet" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box; background: #fff;">
+                    <!-- Updated via JS -->
+                </select>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px;">
+                <div style="text-align: left;">
+                    <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #1b5e20;">1. Szivattyú Állapot</label>
+                    <select id="addPumpP1State" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px;">
+                        <option value="1">Üzemel</option>
+                        <option value="2">Hibás</option>
+                        <option value="0">Nincs szivattyú</option>
+                    </select>
+                    <input type="text" id="addPumpP1Type" placeholder="Fajtája" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; margin-top: 4px; box-sizing: border-box;">
+                    <input type="text" id="addPumpP1Serial" placeholder="Gyári száma" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; margin-top: 4px; box-sizing: border-box;">
+                </div>
+                <div style="text-align: left;">
+                    <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #1b5e20;">2. Szivattyú Állapot</label>
+                    <select id="addPumpP2State" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 13px;">
+                        <option value="0">Nincs szivattyú</option>
+                        <option value="1">Üzemel</option>
+                        <option value="2">Hibás</option>
+                    </select>
+                    <input type="text" id="addPumpP2Type" placeholder="Fajtája" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; margin-top: 4px; box-sizing: border-box;">
+                    <input type="text" id="addPumpP2Serial" placeholder="Gyári száma" style="width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 12px; margin-top: 4px; box-sizing: border-box;">
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeAddPumpModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveNewPumpFromWeb()" style="background: #1b5e20; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés ✔</button>
             </div>
         </div>
     </div>
