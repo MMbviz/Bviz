@@ -371,19 +371,17 @@ function saveEditFromWeb() {
 }
 
 function deleteReadingFromWeb(docId) {
-    if (confirm("Biztosan törölni szeretnéd ezt a villanyóra leolvasási adatot?")) {
-        electricityReadings = electricityReadings.filter(r => r.id !== docId);
-        renderTable();
+    electricityReadings = electricityReadings.filter(r => r.id !== docId);
+    renderTable();
 
-        if (typeof firebase !== 'undefined') {
-            try {
-                const db = firebase.firestore();
-                db.collection("electricity_readings").doc(docId).delete()
-                    .then(() => console.log("Sikeresen törölve a Firestore-ból:", docId))
-                    .catch(e => console.error("Hiba a Firestore törlésnél:", e));
-            } catch (e) {
-                console.error("Firebase hiba:", e);
-            }
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("electricity_readings").doc(docId).delete()
+                .then(() => console.log("Sikeresen 1-kattintással törölve a Firestore-ból:", docId))
+                .catch(e => console.error("Hiba a Firestore törlésnél:", e));
+        } catch (e) {
+            console.error("Firebase hiba:", e);
         }
     }
 }
@@ -966,51 +964,47 @@ function saveCleaningEditFromWeb() {
 }
 
 function deleteCleaningRecordFromWeb(docId) {
-    if (confirm("Biztosan törölni szeretnéd ezt a takarítási adatot?")) {
-        cleaningRecords = cleaningRecords.filter(r => r.id !== docId);
-        renderCleaningTable();
+    cleaningRecords = cleaningRecords.filter(r => r.id !== docId);
+    renderCleaningTable();
 
-        if (typeof firebase !== 'undefined') {
-            try {
-                const db = firebase.firestore();
-                db.collection("cleaning_records").doc(docId).delete()
-                    .then(() => {
-                        console.log("Sikeresen törölve a Firestore-ból:", docId);
-                    })
-                    .catch(e => console.error("Hiba a Firestore törlésnél:", e));
-            } catch (e) {
-                console.error("Firebase hiba:", e);
-            }
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("cleaning_records").doc(docId).delete()
+                .then(() => {
+                    console.log("Sikeresen 1-kattintással törölve a Firestore-ból:", docId);
+                })
+                .catch(e => console.error("Hiba a Firestore törlésnél:", e));
+        } catch (e) {
+            console.error("Firebase hiba:", e);
         }
     }
 }
 
 function deletePumpRecordFromWeb(docId) {
-    if (confirm("Biztosan törölni szeretnéd ezt a szivattyú nyilvántartási adatot/átemelőt?")) {
-        const targetRecord = pumpRecords.find(r => r.id === docId);
-        if (targetRecord) {
-            const town = targetRecord.settlementName;
-            const street = targetRecord.streetName;
-            if (streetMapData[town]) {
-                streetMapData[town] = streetMapData[town].filter(s => s !== street);
-            }
+    const targetRecord = pumpRecords.find(r => r.id === docId);
+    if (targetRecord) {
+        const town = targetRecord.settlementName;
+        const street = targetRecord.streetName;
+        if (streetMapData[town]) {
+            streetMapData[town] = streetMapData[town].filter(s => s !== street);
         }
+    }
 
-        pumpRecords = pumpRecords.filter(r => r.id !== docId);
-        renderPumpTable();
+    pumpRecords = pumpRecords.filter(r => r.id !== docId);
+    renderPumpTable();
 
-        if (typeof firebase !== 'undefined') {
-            try {
-                const db = firebase.firestore();
-                db.collection("pump_records").doc(docId).delete()
-                    .then(() => console.log("Sikeresen törölve a Firestore-ból (pump_records):", docId))
-                    .catch(e => console.error("Hiba a Firestore törlésnél:", e));
-                db.collection("custom_streets").doc(docId).delete()
-                    .then(() => console.log("Sikeresen törölve a custom_streets-ből:", docId))
-                    .catch(e => console.error("Hiba a custom_streets törlésnél:", e));
-            } catch (e) {
-                console.error("Firebase hiba:", e);
-            }
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("pump_records").doc(docId).delete()
+                .then(() => console.log("Sikeresen 1-kattintással törölve a Firestore-ból (pump_records):", docId))
+                .catch(e => console.error("Hiba a Firestore törlésnél:", e));
+            db.collection("custom_streets").doc(docId).delete()
+                .then(() => console.log("Sikeresen törölve a custom_streets-ből:", docId))
+                .catch(e => console.error("Hiba a custom_streets törlésnél:", e));
+        } catch (e) {
+            console.error("Firebase hiba:", e);
         }
     }
 }
@@ -1203,7 +1197,7 @@ function renderPumpTable() {
         };
         row.innerHTML = `
             <td><strong>${item.dateString || '2026. 11. 11.'}</strong></td>
-            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">⚙️ ${item.settlementName || 'Apaj'}</span></td>
+            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">🛠️ ${item.settlementName || 'Apaj'}</span></td>
             <td><strong>${item.streetName || 'Helyszín'}</strong></td>
             <td>${p1StatusBadge} ${p1Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p1Details + ')</span>' : ''}</td>
             <td>${p2StatusBadge} ${p2Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p2Details + ')</span>' : ''}</td>
@@ -2156,27 +2150,47 @@ function openHistoryModal(town, street) {
 }
 
 function deleteSingleHistoryRecord(recordId, town, street) {
-    if (confirm("Biztosan törölni szeretnéd ezt a konkrét leolvasási sort az előzményekből?")) {
-        // Delete ONLY the specific clicked record ID from local memory!
-        electricityReadings = electricityReadings.filter(r => r.id !== recordId);
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
+    const targetItem = electricityReadings.find(r => r.id === recordId);
 
-        // Delete ONLY this specific document ID from Cloud Firestore
-        if (typeof firebase !== 'undefined') {
-            try {
-                const db = firebase.firestore();
-                db.collection("electricity_readings").doc(recordId).delete()
-                    .then(() => console.log("Sikeresen törölve a konkrét előzmény elem:", recordId))
+    let idsToDelete = [recordId];
+    const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+
+    if (targetItem) {
+        const targetKwh = Math.round(Number(targetItem.dayKwh || 0));
+        const targetDate = targetItem.dateString;
+
+        // Find all matching duplicate/archive documents for this street, kwh and date
+        const matches = electricityReadings.filter(r =>
+            r.id === recordId ||
+            (normalizeStreetName(r.settlementName) === normTown &&
+             normalizeStreetName(r.meterName) === normStreet &&
+             (Math.round(r.dayKwh) === targetKwh || r.dateString === targetDate))
+        );
+
+        idsToDelete = [...new Set([recordId, fixedDocId, ...matches.map(r => r.id)])];
+    }
+
+    // 1. Immediately remove ALL matching IDs from local memory (0ms delay!)
+    electricityReadings = electricityReadings.filter(r => !idsToDelete.includes(r.id));
+
+    // 2. Instantly update open history modal and main table
+    openHistoryModal(town, street);
+    renderTable();
+
+    // 3. Delete ALL matching document IDs from Cloud Firestore in background
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            idsToDelete.forEach(id => {
+                db.collection("electricity_readings").doc(id).delete()
+                    .then(() => console.log("Sikeresen 1-kattintással törölve mindenhonnan:", id))
                     .catch(e => console.error("Hiba a törlésnél:", e));
-            } catch (e) {
-                console.error("Firebase error:", e);
-            }
+            });
+        } catch (e) {
+            console.error("Firebase error:", e);
         }
-
-        // Re-render open history modal and main table
-        setTimeout(() => {
-            openHistoryModal(town, street);
-            renderTable();
-        }, 150);
     }
 }
 
