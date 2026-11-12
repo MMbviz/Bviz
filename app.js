@@ -82,6 +82,7 @@ function switchWebTab(tabName) {
     const secElec = document.getElementById('electricitySection');
     const secClean = document.getElementById('cleaningSection');
     const secPump = document.getElementById('pumpSection');
+    const primaryBtn = document.getElementById('webPrimaryActionButton');
 
     if (tabName === 'cleaning') {
         if (tabElec) tabElec.classList.remove('active');
@@ -90,6 +91,11 @@ function switchWebTab(tabName) {
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'block';
         if (secPump) secPump.style.display = 'none';
+        if (primaryBtn) {
+            primaryBtn.innerHTML = '➕ Új Takarítás';
+            primaryBtn.onclick = openAddCleaningModal;
+            primaryBtn.style.display = 'inline-block';
+        }
         renderCleaningTable();
     } else if (tabName === 'pump') {
         if (tabElec) tabElec.classList.remove('active');
@@ -98,6 +104,11 @@ function switchWebTab(tabName) {
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'block';
+        if (primaryBtn) {
+            primaryBtn.innerHTML = '➕ Új Szivattyú Adat';
+            primaryBtn.onclick = openAddPumpModal;
+            primaryBtn.style.display = 'inline-block';
+        }
         renderPumpTable();
     } else {
         if (tabElec) tabElec.classList.add('active');
@@ -106,6 +117,11 @@ function switchWebTab(tabName) {
         if (secElec) secElec.style.display = 'block';
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'none';
+        if (primaryBtn) {
+            primaryBtn.innerHTML = '➕ Új Leolvasás';
+            primaryBtn.onclick = openAddElectricityModal;
+            primaryBtn.style.display = 'inline-block';
+        }
         renderTable();
     }
 }
@@ -155,6 +171,8 @@ function openEditModal(docId) {
     }
 
     document.getElementById('editReadingId').value = latestReading ? latestReading.id : fixedDocId;
+    document.getElementById('editOriginalSettlement').value = town;
+    document.getElementById('editOriginalMeterName').value = street;
     document.getElementById('editSettlement').value = (town || 'Apaj').replace(/_/g, ' ');
     document.getElementById('editMeterName').value = (street || 'Helyszín').replace(/_/g, ' ');
     document.getElementById('editPrevDayKwh').value = prevKwhValue;
@@ -175,6 +193,8 @@ function closeEditModal() {
 
 function saveEditFromWeb() {
     const docId = document.getElementById('editReadingId').value;
+    const origSettlement = document.getElementById('editOriginalSettlement') ? document.getElementById('editOriginalSettlement').value.trim() : '';
+    const origMeterName = document.getElementById('editOriginalMeterName') ? document.getElementById('editOriginalMeterName').value.trim() : '';
     const settlementName = document.getElementById('editSettlement').value.trim();
     const meterName = document.getElementById('editMeterName').value.trim();
     const dayKwhVal = document.getElementById('editDayKwh').value.trim();
@@ -183,14 +203,103 @@ function saveEditFromWeb() {
     const userName = document.getElementById('editUserName').value.trim() || 'Vezetői Weboldal';
     const noteText = document.getElementById('editReadingNote') ? document.getElementById('editReadingNote').value.trim() : '';
 
+    const isRenamed = (origMeterName !== '' && normalizeStreetName(origMeterName) !== normalizeStreetName(meterName)) ||
+                      (origSettlement !== '' && normalizeStreetName(origSettlement) !== normalizeStreetName(settlementName));
+
+    if (isRenamed) {
+        const normOrigTown = normalizeStreetName(origSettlement);
+        const normOrigStreet = normalizeStreetName(origMeterName);
+
+        // Delete old document with old name from Firestore to avoid ghost cards
+        const oldFixedDocId = `elec_${origSettlement}_${origMeterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+        if (typeof firebase !== 'undefined') {
+            try {
+                firebase.firestore().collection("electricity_readings").doc(oldFixedDocId).delete();
+            } catch (e) {}
+        }
+
+        // 1. Rename in streetMapData
+        if (streetMapData[origSettlement]) {
+            const idx = streetMapData[origSettlement].findIndex(s => normalizeStreetName(s) === normOrigStreet);
+            if (idx >= 0) {
+                streetMapData[origSettlement][idx] = meterName;
+            }
+        }
+
+        // 2. Rename in electricityReadings
+        electricityReadings.forEach(r => {
+            if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.meterName) === normOrigStreet) {
+                r.settlementName = settlementName;
+                r.meterName = meterName;
+                if (typeof firebase !== 'undefined') {
+                    try {
+                        firebase.firestore().collection("electricity_readings").doc(r.id).update({
+                            settlementName: settlementName,
+                            meterName: meterName
+                        });
+                    } catch (e) {}
+                }
+            }
+        });
+
+        // 3. Rename in cleaningRecords
+        cleaningRecords.forEach(r => {
+            if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.streetName) === normOrigStreet) {
+                r.settlementName = settlementName;
+                r.streetName = meterName;
+                if (typeof firebase !== 'undefined') {
+                    try {
+                        firebase.firestore().collection("cleaning_records").doc(r.id).update({
+                            settlementName: settlementName,
+                            streetName: meterName
+                        });
+                    } catch (e) {}
+                }
+            }
+        });
+
+        // 4. Rename in pumpRecords
+        pumpRecords.forEach(r => {
+            if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.streetName) === normOrigStreet) {
+                r.settlementName = settlementName;
+                r.streetName = meterName;
+                if (typeof firebase !== 'undefined') {
+                    try {
+                        firebase.firestore().collection("pump_records").doc(r.id).update({
+                            settlementName: settlementName,
+                            streetName: meterName
+                        });
+                    } catch (e) {}
+                }
+            }
+        });
+
+        // 5. Broadcast rename event in custom_streets Firestore collection (or delete if renamed back to original)
+        if (typeof firebase !== 'undefined') {
+            try {
+                const renameDocId = `rename_${origSettlement}_${origMeterName}`.replace(/\s+/g, '_').replace(/\./g, '_');
+                if (normalizeStreetName(meterName) === normalizeStreetName(origMeterName)) {
+                    firebase.firestore().collection("custom_streets").doc(renameDocId).delete();
+                } else {
+                    firebase.firestore().collection("custom_streets").doc(renameDocId).set({
+                        settlementName: settlementName,
+                        oldStreetName: origMeterName,
+                        newStreetName: meterName,
+                        timestamp: Date.now()
+                    }, { merge: true });
+                }
+            } catch (e) {}
+        }
+    }
+
     const dayKwh = dayKwhVal !== '' ? Number(dayKwhVal) : 0;
     const prevDayKwh = prevDayKwhVal !== '' && !isNaN(Number(prevDayKwhVal)) ? Number(prevDayKwhVal) : null;
 
     const fixedDocId = `elec_${settlementName}_${meterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
 
     let idx = electricityReadings.findIndex(r =>
-        (r.settlementName || '').trim().toLowerCase() === settlementName.toLowerCase() &&
-        (r.meterName || '').trim().toLowerCase() === meterName.toLowerCase()
+        normalizeStreetName(r.settlementName) === normalizeStreetName(settlementName) &&
+        normalizeStreetName(r.meterName) === normalizeStreetName(meterName)
     );
 
     const payload = {
@@ -256,6 +365,8 @@ function saveEditFromWeb() {
     }
 
     renderTable();
+    renderCleaningTable();
+    renderPumpTable();
     closeEditModal();
 }
 
@@ -1161,6 +1272,18 @@ function initDashboard() {
                 fetchElectricityReadingsFromRest();
             });
 
+            db.collection("custom_street_order").onSnapshot((snapshot) => {
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (data.settlementName && Array.isArray(data.streetsOrder)) {
+                        streetMapData[data.settlementName] = data.streetsOrder;
+                    }
+                });
+                renderTable();
+            }, (error) => {
+                console.warn("Firestore custom_street_order snapshot error:", error);
+            });
+
             db.collection("cleaning_records").onSnapshot((snapshot) => {
                 const list = [];
                 snapshot.forEach((doc) => {
@@ -1385,8 +1508,41 @@ function renderTable() {
 
     displayList.forEach((item) => {
         const row = document.createElement('tr');
-        row.style.cursor = 'pointer';
-        row.title = 'Kattints a sorra a szerkesztéshez!';
+        row.style.cursor = 'grab';
+        row.title = 'Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
+        row.draggable = true;
+
+        row.ondragstart = (e) => {
+            e.dataTransfer.setData('text/plain', JSON.stringify({ town: item.settlementName, street: item.meterName }));
+            row.style.opacity = '0.5';
+            row.style.background = '#e0f2fe';
+        };
+
+        row.ondragend = (e) => {
+            row.style.opacity = '1.0';
+            row.style.background = '';
+        };
+
+        row.ondragover = (e) => {
+            e.preventDefault();
+            row.style.borderTop = '3px solid #0077b6';
+        };
+
+        row.ondragleave = (e) => {
+            row.style.borderTop = '';
+        };
+
+        row.ondrop = (e) => {
+            e.preventDefault();
+            row.style.borderTop = '';
+            try {
+                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                if (data.town === item.settlementName && data.street !== item.meterName) {
+                    reorderStreetInTown(data.town, data.street, item.meterName);
+                }
+            } catch (err) {}
+        };
+
         row.onclick = (e) => {
             if (e.target.tagName !== 'BUTTON') {
                 openEditModal(item.id);
@@ -1410,6 +1566,39 @@ function renderTable() {
         `;
         tbody.appendChild(row);
     });
+}
+
+function reorderStreetInTown(town, draggedStreet, targetStreet) {
+    let list = streetMapData[town];
+    if (!list) list = [];
+
+    const draggedIdx = list.findIndex(s => normalizeStreetName(s) === normalizeStreetName(draggedStreet));
+    const targetIdx = list.findIndex(s => normalizeStreetName(s) === normalizeStreetName(targetStreet));
+
+    if (draggedIdx >= 0 && targetIdx >= 0) {
+        const [movedItem] = list.splice(draggedIdx, 1);
+        list.splice(targetIdx, 0, movedItem);
+        streetMapData[town] = list;
+
+        renderTable();
+
+        // Save new order to Cloud Firestore
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                const docId = `order_${town}`.replace(/\s+/g, '_');
+                db.collection("custom_street_order").doc(docId).set({
+                    settlementName: town,
+                    streetsOrder: list,
+                    timestamp: Date.now()
+                }, { merge: true })
+                .then(() => console.log("Új utca sorrend elmentve a Firestore-ban:", town))
+                .catch(e => console.error("Hiba a sorrend mentésénél:", e));
+            } catch (e) {
+                console.error("Firebase save order error:", e);
+            }
+        }
+    }
 }
 
 // Add Custom Street Modal functions
@@ -2072,4 +2261,41 @@ function closeHistoryModal() {
     if (modal) modal.style.display = 'none';
 }
 
-document.addEventListener('DOMContentLoaded', checkWebSession);
+function toggleWebTheme() {
+    const isDark = document.body.classList.toggle('dark-theme');
+    localStorage.setItem('bviz_web_theme', isDark ? 'dark' : 'light');
+    updateThemeButtonUI(isDark);
+}
+
+function initWebTheme() {
+    const savedTheme = localStorage.getItem('bviz_web_theme');
+    const isDark = savedTheme === 'dark';
+    if (isDark) {
+        document.body.classList.add('dark-theme');
+    } else {
+        document.body.classList.remove('dark-theme');
+    }
+    updateThemeButtonUI(isDark);
+}
+
+function updateThemeButtonUI(isDark) {
+    const btn = document.getElementById('themeToggleBtn');
+    if (btn) {
+        if (isDark) {
+            btn.innerHTML = '☀️ Világos Mód';
+            btn.style.background = '#fbbf24';
+            btn.style.color = '#0f172a';
+            btn.style.borderColor = '#f59e0b';
+        } else {
+            btn.innerHTML = '🌙 Sötét Mód';
+            btn.style.background = 'rgba(255,255,255,0.15)';
+            btn.style.color = '#80deea';
+            btn.style.borderColor = 'rgba(128,222,234,0.4)';
+        }
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    checkWebSession();
+    initWebTheme();
+});

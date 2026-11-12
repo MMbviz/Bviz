@@ -44,6 +44,104 @@
             overflow: hidden;
             margin-bottom: 24px;
         }
+
+        /* Eye-Care Deep Dark Theme Styles (Photo 2 Midnight Color) */
+        body.dark-theme {
+            background-color: #060b14 !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-theme .dashboard-container,
+        body.dark-theme .table-card,
+        body.dark-theme .table-wrapper,
+        body.dark-theme div[style*="background"],
+        body.dark-theme div:not(.header-left-buttons):not(.logo-area) {
+            background-color: #080d19 !important;
+            border-color: #1a2333 !important;
+        }
+
+        body.dark-theme .table-card,
+        body.dark-theme div[style*="background: #ffffff"],
+        body.dark-theme div[style*="background:#ffffff"],
+        body.dark-theme div[style*="background: #f8fafc"],
+        body.dark-theme div[style*="background:#f8fafc"] {
+            background: #080d19 !important;
+            border-color: #1a2333 !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+        }
+
+        body.dark-theme .data-table,
+        body.dark-theme table,
+        body.dark-theme tbody,
+        body.dark-theme tr {
+            background: #080d19 !important;
+        }
+
+        body.dark-theme .data-table th,
+        body.dark-theme th {
+            background: #040810 !important;
+            color: #38bdf8 !important;
+            border-bottom: 2px solid #1a2333 !important;
+            font-size: 15px !important;
+        }
+
+        body.dark-theme .data-table td,
+        body.dark-theme td {
+            background: #080d19 !important;
+            border-bottom: 1px solid #1a2333 !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-theme .data-table td strong,
+        body.dark-theme .data-table td span:not([style*="background"]) {
+            color: #ffffff !important;
+            font-weight: bold !important;
+            font-size: 15px !important;
+        }
+
+        body.dark-theme .data-table tr:hover,
+        body.dark-theme .data-table tr:hover td {
+            background: #101929 !important;
+        }
+
+        body.dark-theme input[type="text"],
+        body.dark-theme input[type="number"],
+        body.dark-theme select,
+        body.dark-theme textarea {
+            background: #040810 !important;
+            color: #ffffff !important;
+            border: 1px solid #0284c7 !important;
+        }
+
+        body.dark-theme h1,
+        body.dark-theme h2,
+        body.dark-theme h3,
+        body.dark-theme label,
+        body.dark-theme strong,
+        body.dark-theme p,
+        body.dark-theme span:not([style*="background"]) {
+            color: #ffffff !important;
+        }
+
+        body.dark-theme .web-tab-button {
+            background: #080d19 !important;
+            color: #80deea !important;
+            border-color: #0077b6 !important;
+        }
+
+        body.dark-theme .web-tab-button.active {
+            background: linear-gradient(135deg, #0077b6, #0284c7) !important;
+            color: #ffffff !important;
+        }
+
+        body.dark-theme div[id*="Modal"] > div {
+            background: #080d19 !important;
+            color: #ffffff !important;
+            border: 2px solid #0284c7 !important;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.9) !important;
+        }
+            border-color: #0284c7 !important;
+        }
         .street-card {
             background: #ffffff;
             border: 1px solid #cbd5e1;
@@ -99,40 +197,47 @@
 
             <!-- Right User Status & Logout -->
             <div class="header-right-area" style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px;">
+                <button id="themeToggleBtn" onclick="toggleWebTheme()" title="Sötét Mód Be/Kikapcsolása" style="background: rgba(255,255,255,0.15); color: #80deea; border: 1px solid rgba(128,222,234,0.4); padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; gap: 6px; backdrop-filter: blur(4px); box-shadow: 0 2px 6px rgba(0,0,0,0.25);">
+                    🌙 Sötét Mód
+                </button>
                 <span id="userDisplay" style="color: #ffffff; font-size: 14px; font-weight: 500; text-shadow: 0 1px 2px rgba(0,0,0,0.6);">Hitelesített Vezetői Hozzáférés: <strong style="color: #80deea; font-size: 15px;">bviz</strong></span>
                 <button onclick="handleWebLogout()" class="btn-red" style="box-shadow: 0 3px 8px rgba(0,0,0,0.3); border-radius: 8px;">Kijelentkezés</button>
             </div>
         </header>
 
-        <!-- Web Navigation Tabs (Pill / Capsule Shape) -->
-        <nav class="web-tab-bar">
-            <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')">
-                ⚡ Villanyórák Nyilvántartása
-            </button>
-            <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')">
-                🚛 Takarítási Nyilvántartás
-            </button>
-            <button id="webTabPump" class="web-tab-button" onclick="switchWebTab('pump')">
-                ⚙️ Szivattyú Nyilvántartás
-            </button>
+        <!-- Web Navigation Tabs & Action Buttons -->
+        <nav class="web-tab-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+            <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')">
+                    ⚡ Villanyórák Nyilvántartása
+                </button>
+                <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')">
+                    🚛 Takarítási Nyilvántartás
+                </button>
+                <button id="webTabPump" class="web-tab-button" onclick="switchWebTab('pump')">
+                    💧 Szivattyú Nyilvántartás
+                </button>
+            </div>
+            <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button id="webPrimaryActionButton" onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                    ➕ Új Leolvasás
+                </button>
+                <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                    ➕ Új átemelő
+                </button>
+                <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                    🗑 Átemelő törlése
+                </button>
+            </div>
         </nav>
 
         <!-- SECTION 1: Electricity Meter Readings -->
         <div id="electricitySection">
             <div class="table-card">
-                <!-- Filter Bar with ➕ Új Leolvasás, ➕ Új átemelő and 🗑 Átemelő törlése buttons -->
+                <!-- Filter Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">⚡ Szennyvíz átemelők villanyóra állása</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <button onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            ➕ Új Leolvasás
-                        </button>
-                        <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            ➕ Új átemelő
-                        </button>
-                        <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            🗑 Átemelő törlése
-                        </button>
                         <input type="text" id="electricitySearch" placeholder="🔍 Keresés..." onkeyup="renderTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
                         <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
                             <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
@@ -204,15 +309,6 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">🚛 Takarítási Nyilvántartás</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <button onclick="openAddCleaningModal()" style="background: #1b5e20; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            ➕ Új Takarítás
-                        </button>
-                        <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            ➕ Új átemelő
-                        </button>
-                        <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            🗑 Átemelő törlése
-                        </button>
                         <input type="text" id="cleaningSearch" placeholder="🔍 Keresés..." onkeyup="renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
                         <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
                             <select id="cleaningPlantFilter" onchange="renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
@@ -279,17 +375,8 @@
             <div class="table-card">
                 <!-- Filter Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
-                    <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">⚙️ Szivattyú Nyilvántartás & Állapotok</h2>
+                    <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">💧 Szivattyú Nyilvántartás & Állapotok</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <button onclick="openAddPumpModal()" style="background: #1b5e20; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            ➕ Új Szivattyú Adat
-                        </button>
-                        <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            ➕ Új átemelő
-                        </button>
-                        <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 8px 16px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
-                            🗑 Átemelő törlése
-                        </button>
                         <input type="text" id="pumpSearch" placeholder="🔍 Keresés..." onkeyup="renderPumpTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
                         <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
                             <select id="pumpPlantFilter" onchange="renderPumpTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
@@ -431,6 +518,8 @@
         <div style="background: #ffffff; padding: 28px 24px; border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); width: 100%; max-width: 440px; border-top: 5px solid #1b5e20;">
             <h2 style="color: #1b5e20; margin-bottom: 16px; font-size: 20px;">✏️ Leolvasás Szerkesztése</h2>
             <input type="hidden" id="editReadingId">
+            <input type="hidden" id="editOriginalSettlement">
+            <input type="hidden" id="editOriginalMeterName">
             <div style="margin-bottom: 12px; text-align: left;">
                 <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #555;">Település</label>
                 <input type="text" id="editSettlement" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
