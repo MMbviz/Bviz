@@ -52,21 +52,39 @@
             color: #ffffff !important;
         }
 
-        body.dark-theme .dashboard-container,
-        body.dark-theme .table-card,
-        body.dark-theme .table-wrapper,
-        body.dark-theme div[style*="background"],
-        body.dark-theme div:not(.header-left-buttons):not(.logo-area) {
-            background-color: #080d19 !important;
-            border-color: #1a2333 !important;
+        body.dark-theme #loginScreen > div {
+            background: #080d19 !important;
+            border-color: #0077b6 !important;
+            box-shadow: 0 15px 40px rgba(0,0,0,0.8) !important;
+        }
+
+        body.dark-theme #loginScreen input[type="text"],
+        body.dark-theme #loginScreen input[type="password"] {
+            background: #040810 !important;
+            color: #ffffff !important;
+            border-color: #0284c7 !important;
+        }
+
+        body.dark-theme #loginScreen label,
+        body.dark-theme #loginScreen p {
+            color: #ffffff !important;
+        }
+
+        body.dark-theme .top-header,
+        body.dark-theme .top-header div,
+        body.dark-theme .header-right-area,
+        body.dark-theme .header-left-buttons,
+        body.dark-theme .logo-area {
+            background-color: transparent !important;
+            background: transparent !important;
+            border-color: transparent !important;
         }
 
         body.dark-theme .table-card,
-        body.dark-theme div[style*="background: #ffffff"],
-        body.dark-theme div[style*="background:#ffffff"],
-        body.dark-theme div[style*="background: #f8fafc"],
-        body.dark-theme div[style*="background:#f8fafc"] {
-            background: #080d19 !important;
+        body.dark-theme .table-wrapper,
+        body.dark-theme div.table-card > div,
+        body.dark-theme div[id*="Section"] > div.table-card {
+            background-color: #080d19 !important;
             border-color: #1a2333 !important;
             box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
         }
@@ -160,6 +178,13 @@
 </head>
 <body>
 
+    <!-- Global Datalist for Pump Types -->
+    <datalist id="pumpTypeOptions">
+        <option value="Flygt"></option>
+        <option value="Hidrosztal"></option>
+        <option value="Grundfos"></option>
+    </datalist>
+
     <!-- Master Web Login Screen -->
     <div id="loginScreen" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 100%; max-width: 440px; text-align: center; border-top: 6px solid #1b5e20;">
@@ -220,6 +245,12 @@
                 </button>
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <button onclick="generateRandomReadingsForAllStreets()" style="background: #15803d; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Töltsd ki az összes utca leolvasását random 4-jegyű számmal!">
+                    🎲 4-jegyű Adatok Feltöltése
+                </button>
+                <button onclick="simulate5thRollover()" style="background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Szimuláld a hónap 5-i automatikus átgördülést!">
+                    🚀 5-i Átgördülés Szimulálása
+                </button>
                 <button id="webPrimaryActionButton" onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
                     ➕ Új Leolvasás
                 </button>
@@ -285,11 +316,7 @@
                 <!-- Table Footer Pagination Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <span id="electricitySummaryCount" style="color: #64748b; font-size: 13px; font-weight: 500;">Összesen: 0 bejegyzés</span>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Előző</button>
-                        <button style="padding: 6px 12px; border-radius: 6px; border: none; background: #1b5e20; color: #ffffff; font-size: 13px; font-weight: bold; cursor: pointer;">1</button>
-                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Következő</button>
-                    </div>
+                    <div id="electricityPaginationControls" style="display: flex; gap: 6px; align-items: center;"></div>
                     <div>
                         <label style="color: #64748b; font-size: 13px; font-weight: 500;">Mutass:
                             <select id="electricityPageSize" onchange="renderTable()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px;">
@@ -353,11 +380,7 @@
                 <!-- Table Footer Pagination Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <span id="cleaningSummaryCount" style="color: #64748b; font-size: 13px; font-weight: 500;">Összesen: 0 bejegyzés</span>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Előző</button>
-                        <button style="padding: 6px 12px; border-radius: 6px; border: none; background: #1b5e20; color: #ffffff; font-size: 13px; font-weight: bold; cursor: pointer;">1</button>
-                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Következő</button>
-                    </div>
+                    <div id="cleaningPaginationControls" style="display: flex; gap: 6px; align-items: center;"></div>
                     <div>
                         <label style="color: #64748b; font-size: 13px; font-weight: 500;">Mutass:
                             <select id="cleaningPageSize" onchange="renderCleaningTable()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px;">
@@ -427,11 +450,7 @@
                 <!-- Table Footer Pagination Bar -->
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border-top: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <span id="pumpSummaryCount" style="color: #64748b; font-size: 13px; font-weight: 500;">Összesen: 0 bejegyzés</span>
-                    <div style="display: flex; gap: 6px; align-items: center;">
-                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Előző</button>
-                        <button style="padding: 6px 12px; border-radius: 6px; border: none; background: #1b5e20; color: #ffffff; font-size: 13px; font-weight: bold; cursor: pointer;">1</button>
-                        <button style="padding: 6px 12px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #475569; font-size: 13px; font-weight: 600; cursor: pointer;">Következő</button>
-                    </div>
+                    <div id="pumpPaginationControls" style="display: flex; gap: 6px; align-items: center;"></div>
                     <div>
                         <label style="color: #64748b; font-size: 13px; font-weight: 500;">Mutass:
                             <select id="pumpPageSize" onchange="renderPumpTable()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; background: #ffffff; color: #0f172a; font-size: 13px;">
