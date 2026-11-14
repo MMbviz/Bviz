@@ -251,6 +251,12 @@
                 <button onclick="simulate5thRollover()" style="background: #0284c7; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Szimuláld a hónap 5-i automatikus átgördülést!">
                     🚀 5-i Átgördülés Szimulálása
                 </button>
+                <button onclick="deleteAllHistoryRecordsFromAllTowns()" style="background: #c62828; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Töröld az ÖSSZES település ÖSSZES utcájának elmentett előzményeit egyetlen kattintással!">
+                    🗑 Összes Előzmény Törlése
+                </button>
+                <button onclick="resetAllMeterReadingsToZero()" style="background: #b71c1c; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Töröld az ÖSSZES tesztadatot és indíts 100%-ban tiszta lappal!">
+                    🧹 Adatbázis Kitakarítása
+                </button>
                 <button id="webPrimaryActionButton" onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
                     ➕ Új Leolvasás
                 </button>
@@ -578,11 +584,46 @@
     <!-- Reading History Modal -->
     <div id="historyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
         <div style="background: #ffffff; padding: 28px 24px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 600px; border-top: 5px solid #0077b6;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
                 <h2 style="color: #0077b6; font-size: 20px; margin: 0;">📜 Korábbi Óraállások Előzményei</h2>
-                <button onclick="closeHistoryModal()" style="background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px;">✕ Bezárás</button>
+                <div style="display: flex; gap: 8px; align-items: center;">
+                    <button onclick="deleteAllHistoryForCurrentStreet()" title="Töröld ennek az utcának az ÖSSZES elmentett előzményét 1 kattintással!" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px;">
+                        🗑 Ennek az utcának az összes előzményének törlése
+                    </button>
+                    <button onclick="closeHistoryModal()" style="background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px;">✕ Bezárás</button>
+                </div>
             </div>
-            <p id="historyModalSubtitle" style="color: #475569; font-size: 14px; margin-top: -8px; margin-bottom: 16px; font-weight: 600;"></p>
+            <p id="historyModalSubtitle" style="color: #475569; font-size: 14px; margin-top: -8px; margin-bottom: 12px; font-weight: 600;"></p>
+
+            <!-- Year and Month Search / Filter Bar -->
+            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px; background: #f8fafc; padding: 10px 14px; border-radius: 10px; border: 1px solid #e2e8f0; flex-wrap: wrap;">
+                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 6px;">
+                    <span onclick="triggerCalendarPicker()" title="Kattints a naptár ikonra bármelyik év és hónap kiválasztásához!" style="cursor: pointer; font-size: 15px; background: #e0f2fe; color: #0284c7; padding: 4px 10px; border-radius: 6px; border: 1px solid #7dd3fc; user-select: none;">📅 Év:</span>
+                    <select id="historyYearFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff;">
+                        <option value="ALL">Minden Év</option>
+                    </select>
+                    <input type="date" id="historyCalendarPicker" onchange="onCalendarDatePicked(this.value)" style="display: none;">
+                </label>
+
+                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 6px;">
+                    🗓 Hónap:
+                    <select id="historyMonthFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff;">
+                        <option value="ALL">Minden Hónap</option>
+                        <option value="01">Január (01)</option>
+                        <option value="02">Február (02)</option>
+                        <option value="03">Március (03)</option>
+                        <option value="04">Április (04)</option>
+                        <option value="05">Május (05)</option>
+                        <option value="06">Június (06)</option>
+                        <option value="07">Július (07)</option>
+                        <option value="08">Augusztus (08)</option>
+                        <option value="09">Szeptember (09)</option>
+                        <option value="10">Október (10)</option>
+                        <option value="11">November (11)</option>
+                        <option value="12">December (12)</option>
+                    </select>
+                </label>
+            </div>
             <div style="max-height: 360px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
                 <table class="data-table" style="width: 100%; table-layout: auto;">
                     <thead>

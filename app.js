@@ -1299,11 +1299,10 @@ function renderTable() {
             const sameMeterReadings = electricityReadings.filter(r =>
                 normalizeStreetName(r.settlementName) === normTown &&
                 normalizeStreetName(r.meterName) === normStreet
-            ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
 
             const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-            const primaryDoc = sameMeterReadings.find(r => r.id === fixedDocId || r.id.startsWith("elec_"));
-            const latestReading = primaryDoc || (sameMeterReadings.length > 0 ? sameMeterReadings[0] : null);
+            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
             const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
 
             let prevKwhText = '-';
@@ -1781,9 +1780,9 @@ function saveNewElectricityFromWeb() {
         return;
     }
 
-    const newDocId = `web_${Date.now()}`;
+    const fixedDocId = `elec_${settlement}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
     const newRecord = {
-        id: newDocId,
+        id: fixedDocId,
         settlementName: settlement,
         meterName: street,
         dayKwh: dayKwh,
@@ -1794,23 +1793,21 @@ function saveNewElectricityFromWeb() {
         timestamp: Date.now()
     };
 
-    electricityReadings.unshift(newRecord);
+    const existingIdx = electricityReadings.findIndex(r => r.id === fixedDocId);
+    if (existingIdx >= 0) {
+        newRecord.prevDayKwh = electricityReadings[existingIdx].prevDayKwh;
+        electricityReadings[existingIdx] = newRecord;
+    } else {
+        electricityReadings.unshift(newRecord);
+    }
     renderTable();
 
     if (typeof firebase !== 'undefined') {
         try {
             const db = firebase.firestore();
-            db.collection("electricity_readings").add({
-                settlementName: settlement,
-                meterName: street,
-                dayKwh: dayKwh,
-                dateString: dateString,
-                userEmail: getLoggedInAdminEmail(),
-                userName: userName,
-                note: '',
-                timestamp: Date.now()
-            }).then(() => console.log("Új villanyóra leolvasás elmentve Firestore-ba!"))
-            .catch(e => console.error("Hiba az új leolvasás mentésénél:", e));
+            db.collection("electricity_readings").doc(fixedDocId).set(newRecord, { merge: true })
+                .then(() => console.log("Új villanyóra leolvasás elmentve Firestore-ba!"))
+                .catch(e => console.error("Hiba az új leolvasás mentésénél:", e));
         } catch (e) {
             console.error("Firebase save error:", e);
         }
@@ -1970,16 +1967,120 @@ function saveNewPumpFromWeb() {
     closeAddPumpModal();
 }
 
+let currentHistoryTown = '';
+let currentHistoryStreet = '';
+
+function populateHistoryYearDropdown() {
+    const yearSelect = document.getElementById('historyYearFilter');
+    if (!yearSelect) return;
+
+    const currentYear = new Date().getFullYear();
+    const yearsSet = new Set();
+
+    // Default range around current year (e.g. 2020..2035)
+    for (let y = currentYear + 5; y >= 2020; y--) {
+        yearsSet.add(y.toString());
+    }
+
+    // Add any year found in history records
+    electricityReadings.forEach(item => {
+        if (item.dateString && item.dateString.includes('.')) {
+            const yr = item.dateString.split('.')[0].trim();
+            if (yr && yr.length === 4) yearsSet.add(yr);
+        } else if (item.timestamp) {
+            const yr = new Date(item.timestamp).getFullYear().toString();
+            if (yr && yr.length === 4) yearsSet.add(yr);
+        }
+    });
+
+    const sortedYears = Array.from(yearsSet).sort((a, b) => Number(b) - Number(a));
+
+    const selectedVal = yearSelect.value || 'ALL';
+    yearSelect.innerHTML = '<option value="ALL">Minden Év</option>';
+
+    sortedYears.forEach(yr => {
+        const opt = document.createElement('option');
+        opt.value = yr;
+        opt.textContent = yr;
+        if (yr === selectedVal) opt.selected = true;
+        yearSelect.appendChild(opt);
+    });
+}
+
+function triggerCalendarPicker() {
+    const picker = document.getElementById('historyCalendarPicker');
+    if (picker) {
+        if (typeof picker.showPicker === 'function') {
+            picker.showPicker();
+        } else {
+            picker.click();
+        }
+    }
+}
+
+function onCalendarDatePicked(val) {
+    if (!val) return;
+    const parts = val.split('-');
+    if (parts.length >= 1) {
+        const pickedYear = parts[0];
+        const yearSelect = document.getElementById('historyYearFilter');
+        if (yearSelect) {
+            let exists = Array.from(yearSelect.options).some(opt => opt.value === pickedYear);
+            if (!exists) {
+                const opt = document.createElement('option');
+                opt.value = pickedYear;
+                opt.textContent = pickedYear;
+                yearSelect.appendChild(opt);
+            }
+            yearSelect.value = pickedYear;
+        }
+    }
+    if (parts.length >= 2) {
+        const pickedMonth = parts[1].padStart(2, '0');
+        const monthSelect = document.getElementById('historyMonthFilter');
+        if (monthSelect) {
+            monthSelect.value = pickedMonth;
+        }
+    }
+    filterHistoryModalByDate();
+}
+
 function openHistoryModal(town, street) {
+    currentHistoryTown = town;
+    currentHistoryStreet = street;
     const subtitleEl = document.getElementById('historyModalSubtitle');
-    const tbody = document.getElementById('historyModalTableBody');
     if (subtitleEl) subtitleEl.textContent = `${town} • ${street}`;
-    if (tbody) tbody.innerHTML = '';
+
+    populateHistoryYearDropdown();
+
+    // Reset date filter dropdowns to ALL on opening
+    const yearSelect = document.getElementById('historyYearFilter');
+    const monthSelect = document.getElementById('historyMonthFilter');
+    if (yearSelect) yearSelect.value = 'ALL';
+    if (monthSelect) monthSelect.value = 'ALL';
+
+    filterHistoryModalByDate();
+
+    const modal = document.getElementById('historyModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function filterHistoryModalByDate() {
+    const town = currentHistoryTown;
+    const street = currentHistoryStreet;
+    const tbody = document.getElementById('historyModalTableBody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const yearFilter = document.getElementById('historyYearFilter') ? document.getElementById('historyYearFilter').value : 'ALL';
+    const monthFilter = document.getElementById('historyMonthFilter') ? document.getElementById('historyMonthFilter').value : 'ALL';
 
     const normTown = normalizeStreetName(town);
     const normStreet = normalizeStreetName(street);
 
+    // ONLY fetch archived rolled-over documents starting with hist_
     const rawList = electricityReadings.filter(r =>
+        r.id.startsWith("hist_") &&
         normalizeStreetName(r.settlementName) === normTown &&
         normalizeStreetName(r.meterName) === normStreet &&
         ((r.dayKwh && r.dayKwh > 0) || (r.prevDayKwh && r.prevDayKwh > 0))
@@ -1990,19 +2091,42 @@ function openHistoryModal(town, street) {
 
     rawList.forEach(item => {
         const displayKwhVal = item.dayKwh > 0 ? item.dayKwh : item.prevDayKwh;
-        const key = `${Math.round(displayKwhVal)}_${item.dateString}`;
+        // Group strictly by dateString so exactly 1 rolled-over entry per month appears in the history modal
+        const key = `${item.dateString}_${Math.round(displayKwhVal)}`;
         if (!seenKeys.has(key)) {
             seenKeys.add(key);
             historyList.push({ ...item, displayKwh: displayKwhVal });
         }
     });
 
-    if (historyList.length === 0) {
+    // Apply Year and Month filtering based on submission date
+    const filteredList = historyList.filter(item => {
+        const dateStr = item.dateString || '';
+        let itemYear = '';
+        let itemMonth = '';
+
+        if (dateStr.includes('.')) {
+            const parts = dateStr.split('.').map(p => p.trim()).filter(p => p.length > 0);
+            if (parts.length >= 1) itemYear = parts[0];
+            if (parts.length >= 2) itemMonth = parts[1].padStart(2, '0');
+        } else if (item.timestamp) {
+            const d = new Date(item.timestamp);
+            itemYear = d.getFullYear().toString();
+            itemMonth = (d.getMonth() + 1).toString().padStart(2, '0');
+        }
+
+        const matchYear = (yearFilter === 'ALL') || (itemYear === yearFilter);
+        const matchMonth = (monthFilter === 'ALL') || (itemMonth === monthFilter);
+
+        return matchYear && matchMonth;
+    });
+
+    if (filteredList.length === 0) {
         const tr = document.createElement('tr');
-        tr.innerHTML = `<td colspan="5" style="text-align: center; color: #64748b; padding: 16px;">Még nincs elmentett előzmény adat ehhez az utcához.</td>`;
+        tr.innerHTML = `<td colspan="5" style="text-align: center; color: #64748b; padding: 16px;">Még nincs elmentett előzmény adat a kiválasztott év/hónap szűrésre ehhez az utcához.</td>`;
         tbody.appendChild(tr);
     } else {
-        historyList.forEach(item => {
+        filteredList.forEach(item => {
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
             tr.title = 'Duplán kattintva szerkesztheted ezt a korábbi leolvasást!';
@@ -2024,9 +2148,6 @@ function openHistoryModal(town, street) {
             tbody.appendChild(tr);
         });
     }
-
-    const modal = document.getElementById('historyModal');
-    if (modal) modal.style.display = 'flex';
 }
 
 function deleteSingleHistoryRecord(recordId, town, street) {
@@ -2074,6 +2195,106 @@ function deleteSingleHistoryRecord(recordId, town, street) {
     }
 }
 
+function deleteAllHistoryForCurrentStreet() {
+    if (!currentHistoryTown || !currentHistoryStreet) return;
+    if (!confirm(`Biztosan törölni szeretnéd a(z) ${currentHistoryTown} • ${currentHistoryStreet} ÖSSZES elmentett előzményét 1 kattintással?`)) return;
+
+    const normTown = normalizeStreetName(currentHistoryTown);
+    const normStreet = normalizeStreetName(currentHistoryStreet);
+
+    const historyDocs = electricityReadings.filter(r =>
+        normalizeStreetName(r.settlementName) === normTown &&
+        normalizeStreetName(r.meterName) === normStreet &&
+        (r.id.startsWith("hist_") || (r.id !== `elec_${currentHistoryTown}_${currentHistoryStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_') && !r.id.startsWith("elec_")))
+    );
+
+    const idsToDelete = historyDocs.map(r => r.id);
+
+    electricityReadings = electricityReadings.filter(r => !idsToDelete.includes(r.id));
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            idsToDelete.forEach(id => {
+                db.collection("electricity_readings").doc(id).delete();
+            });
+        } catch (e) {}
+    }
+
+    openHistoryModal(currentHistoryTown, currentHistoryStreet);
+    renderTable();
+    alert(`🗑 Sikeresen 1 kattintással törölve ${idsToDelete.length} előzmény rekord!`);
+}
+
+function deleteAllHistoryRecordsFromAllTowns() {
+    if (!confirm("⚠️ Döntő lépés! Biztosan törölni szeretnéd az ÖSSZES TELEPÜLÉS ÖSSZES UTCÁJÁNAK elmentett előzményeit egyetlen kattintással? (Az aktuális havi aktív leolvasás érintetlen marad!)")) return;
+
+    const historyDocs = electricityReadings.filter(r => r.id.startsWith("hist_") || !r.id.startsWith("elec_"));
+    const idsToDelete = historyDocs.map(r => r.id);
+
+    electricityReadings = electricityReadings.filter(r => r.id.startsWith("elec_"));
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            let batch = db.batch();
+            let count = 0;
+
+            idsToDelete.forEach(id => {
+                const ref = db.collection("electricity_readings").doc(id);
+                batch.delete(ref);
+                count++;
+                if (count >= 400) {
+                    batch.commit();
+                    batch = db.batch();
+                    count = 0;
+                }
+            });
+
+            if (count > 0) {
+                batch.commit();
+            }
+        } catch (e) {}
+    }
+
+    renderTable();
+    if (document.getElementById('historyModal')) {
+        document.getElementById('historyModal').style.display = 'none';
+    }
+    alert(`🗑 Sikeresen törölve az ÖSSZES TELEPÜLÉS ÖSSZES UTCÁJÁNAK előzménye (${idsToDelete.length} rekord)!`);
+}
+
+function resetAllMeterReadingsToZero() {
+    if (!confirm("⚠️ Tiszta Indulás! Biztosan ki szeretnéd törölni az ÖSSZES tesztadatot és nullázni szeretnéd az összes utcát a felhőben?")) return;
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("electricity_readings").get().then((snapshot) => {
+                let batch = db.batch();
+                let count = 0;
+                snapshot.forEach((doc) => {
+                    batch.delete(doc.ref);
+                    count++;
+                    if (count >= 400) {
+                        batch.commit();
+                        batch = db.batch();
+                        count = 0;
+                    }
+                });
+                if (count > 0) {
+                    batch.commit();
+                }
+                electricityReadings = [];
+                renderTable();
+                alert("🧹 Sikeresen 100%-ban kitakarítva az összes tesztadat a Firebase adatbázisból!");
+            });
+        } catch (e) {
+            console.error(e);
+        }
+    }
+}
+
 function generateRandomReadingsForAllStreets() {
     const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
     const timestampNow = Date.now();
@@ -2081,26 +2302,20 @@ function generateRandomReadingsForAllStreets() {
     Object.keys(streetMapData).forEach(town => {
         const streets = streetMapData[town] || [];
         streets.forEach(street => {
+            const normTown = normalizeStreetName(town);
+            const normStreet = normalizeStreetName(street);
             const random4Digit = Math.floor(1000 + Math.random() * 9000);
             const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-            const archiveId = `hist_${town}_${street}_${timestampNow}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+
+            const existing = electricityReadings.find(r => r.id === fixedDocId || (normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.meterName) === normStreet));
+            const basePrev = (existing && existing.prevDayKwh && existing.prevDayKwh > 0) ? existing.prevDayKwh : 0;
 
             const payload = {
                 id: fixedDocId,
                 settlementName: town,
                 meterName: street,
                 dayKwh: random4Digit,
-                dateString: dateStr,
-                userName: getLoggedInAdminName(),
-                userEmail: getLoggedInAdminEmail(),
-                timestamp: timestampNow
-            };
-
-            const archivePayload = {
-                id: archiveId,
-                settlementName: town,
-                meterName: street,
-                dayKwh: random4Digit,
+                prevDayKwh: basePrev,
                 dateString: dateStr,
                 userName: getLoggedInAdminName(),
                 userEmail: getLoggedInAdminEmail(),
@@ -2110,18 +2325,17 @@ function generateRandomReadingsForAllStreets() {
             const idx = electricityReadings.findIndex(r => r.id === fixedDocId);
             if (idx >= 0) {
                 electricityReadings[idx].dayKwh = random4Digit;
+                electricityReadings[idx].prevDayKwh = basePrev;
                 electricityReadings[idx].dateString = dateStr;
                 electricityReadings[idx].timestamp = timestampNow;
             } else {
                 electricityReadings.unshift(payload);
             }
-            electricityReadings.unshift(archivePayload);
 
             if (typeof firebase !== 'undefined') {
                 try {
                     const db = firebase.firestore();
                     db.collection("electricity_readings").doc(fixedDocId).set(payload, { merge: true });
-                    db.collection("electricity_readings").doc(archiveId).set(archivePayload, { merge: true });
                 } catch (e) {}
             }
         });
@@ -2146,12 +2360,12 @@ function simulate5thRollover() {
                 normalizeStreetName(r.meterName) === normStreet
             ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
+            const activeReading = sameMeterReadings.find(r => r.dayKwh && r.dayKwh > 0);
 
-            if (latestReading && latestReading.dayKwh > 0) {
+            if (activeReading && activeReading.dayKwh > 0) {
                 rolledCount++;
-                const currentReadingVal = latestReading.dayKwh;
-                const currentPrevVal = latestReading.prevDayKwh || null;
+                const currentReadingVal = activeReading.dayKwh;
+                const currentPrevVal = activeReading.prevDayKwh || null;
                 const timestampNow = Date.now();
                 const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
                 const archiveId = `hist_${town}_${street}_${timestampNow}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
@@ -2162,10 +2376,10 @@ function simulate5thRollover() {
                     meterName: street,
                     dayKwh: currentReadingVal,
                     prevDayKwh: currentPrevVal,
-                    dateString: latestReading.dateString || dateStr,
-                    userName: latestReading.userName || getLoggedInAdminName(),
-                    userEmail: latestReading.userEmail || getLoggedInAdminEmail(),
-                    note: latestReading.note || '',
+                    dateString: activeReading.dateString || dateStr,
+                    userName: activeReading.userName || getLoggedInAdminName(),
+                    userEmail: activeReading.userEmail || getLoggedInAdminEmail(),
+                    note: activeReading.note || '',
                     timestamp: timestampNow
                 };
 
