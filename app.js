@@ -676,8 +676,9 @@ function openPumpVisualView(town, street) {
     const p1Serial = record ? (record.pump1Serial || '') : '';
     const p2Type = record ? (record.pump2Type || '') : '';
     const p2Serial = record ? (record.pump2Serial || '') : '';
+    const pNote = record ? (record.note || '') : '';
 
-    renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial);
+    renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote);
 
     visualContainer.style.display = 'block';
     visualContainer.scrollIntoView({ behavior: 'smooth' });
@@ -705,9 +706,10 @@ function saveCurrentVisualPump(shouldReRender = false) {
     const p1Serial = document.getElementById('webP1Serial') ? document.getElementById('webP1Serial').value : '';
     const p2Type = document.getElementById('webP2Type') ? document.getElementById('webP2Type').value : '';
     const p2Serial = document.getElementById('webP2Serial') ? document.getElementById('webP2Serial').value : '';
+    const pNote = document.getElementById('webPNote') ? document.getElementById('webPNote').value : '';
 
     if (shouldReRender) {
-        renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial);
+        renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote);
     }
 
     const docId = `${currentVisualTown}_${currentVisualStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
@@ -726,6 +728,7 @@ function saveCurrentVisualPump(shouldReRender = false) {
         pump2Serial: p2Serial,
         pump2RemoveDate: "",
         pump2Pos: 2,
+        note: pNote,
         dateString: dateStr,
         userEmail: getLoggedInAdminEmail(),
         userName: getLoggedInAdminName(),
@@ -747,17 +750,17 @@ function saveCurrentVisualPump(shouldReRender = false) {
     }, 200);
 }
 
-function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial) {
+function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote) {
     const visualContainer = document.getElementById('pumpVisualContainer');
     if (!visualContainer) return;
 
-    const p1ChipBg = currentP1State === 1 ? '#e6f4ea' : (currentP1State === 2 ? '#fee2e2' : '#f1f5f9');
+    const p1ChipBg = currentP1State === 1 ? '#15803d' : (currentP1State === 2 ? '#dc2626' : '#475569');
     const p1ChipText = currentP1State === 1 ? '● Üzemel' : (currentP1State === 2 ? '● Hibás' : 'Nincs szivattyú');
-    const p1ChipColor = currentP1State === 1 ? '#137333' : (currentP1State === 2 ? '#b91c1c' : '#64748b');
+    const p1ChipColor = '#ffffff';
 
-    const p2ChipBg = currentP2State === 1 ? '#e6f4ea' : (currentP2State === 2 ? '#fee2e2' : '#f1f5f9');
+    const p2ChipBg = currentP2State === 1 ? '#15803d' : (currentP2State === 2 ? '#dc2626' : '#475569');
     const p2ChipText = currentP2State === 1 ? '● Üzemel' : (currentP2State === 2 ? '● Hibás' : 'Nincs szivattyú');
-    const p2ChipColor = currentP2State === 1 ? '#137333' : (currentP2State === 2 ? '#b91c1c' : '#64748b');
+    const p2ChipColor = '#ffffff';
 
     visualContainer.innerHTML = `
         <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 600px; margin: 0 auto; overflow: hidden; border: 1px solid #cbd5e1;">
@@ -811,6 +814,15 @@ function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial) {
                                 ${p2Serial ? '<span onclick="clearWebInput(\'webP2Serial\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
                             </div>
                         </div>
+                    </div>
+                </div>
+
+                <!-- 3. KOCKA (Megjegyzés) -->
+                <div style="margin-top: 16px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                    <label style="display: block; font-size: 13px; font-weight: bold; color: #1e293b; margin-bottom: 6px;">📝 Megjegyzés / Észrevételek</label>
+                    <div style="position: relative;">
+                        <textarea id="webPNote" oninput="saveCurrentVisualPump(false)" placeholder="Írj megjegyzést a szivattyúk állapotáról..." style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; resize: vertical; min-height: 60px;">${pNote || ''}</textarea>
+                        ${pNote ? '<span onclick="clearWebInput(\'webPNote\')" style="position: absolute; right: 10px; top: 12px; color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
                     </div>
                 </div>
             </div>
@@ -1095,16 +1107,16 @@ function renderPumpTable() {
 
     displayList.forEach((item) => {
         const p1StatusBadge = item.pump1State === 1
-            ? '<span style="background: #e6f4ea; color: #137333; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Üzemel</span>'
+            ? '<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">● Üzemel</span>'
             : (item.pump1State === 2
-                ? '<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Hibás</span>'
-                : '<span style="background: #f1f5f9; color: #64748b; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>');
+                ? '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">● Hibás</span>'
+                : '<span style="background: #475569; color: #ffffff; font-weight: 600; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>');
 
         const p2StatusBadge = item.pump2State === 1
-            ? '<span style="background: #e6f4ea; color: #137333; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Üzemel</span>'
+            ? '<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">● Üzemel</span>'
             : (item.pump2State === 2
-                ? '<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">● Hibás</span>'
-                : '<span style="background: #f1f5f9; color: #64748b; font-weight: 600; padding: 4px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>');
+                ? '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">● Hibás</span>'
+                : '<span style="background: #475569; color: #ffffff; font-weight: 600; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>');
 
         const p1Details = [item.pump1Type, item.pump1Serial].filter(Boolean).join(' - ');
         const p2Details = [item.pump2Type, item.pump2Serial].filter(Boolean).join(' - ');
@@ -1112,10 +1124,8 @@ function renderPumpTable() {
         const row = document.createElement('tr');
         row.style.cursor = 'pointer';
         row.title = 'Kattints a sorra a szerkesztéshez!';
-        row.onclick = (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                openPumpVisualView(item.settlementName || '', item.streetName || '');
-            }
+        row.onclick = () => {
+            openPumpVisualView(item.settlementName || '', item.streetName || '');
         };
         row.innerHTML = `
             <td><strong>${item.dateString || '2026. 11. 11.'}</strong></td>
@@ -1123,12 +1133,8 @@ function renderPumpTable() {
             <td><strong>${item.streetName || 'Helyszín'}</strong></td>
             <td>${p1StatusBadge} ${p1Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p1Details + ')</span>' : ''}</td>
             <td>${p2StatusBadge} ${p2Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p2Details + ')</span>' : ''}</td>
-            <td><strong style="color: #0077b6;">👤 ${item.userName || 'Rendszer'}</strong></td>
-            <td style="text-align: center; white-space: nowrap;">
-                <button onclick="deletePumpRecordFromWeb('${item.id}')" class="btn-icon-delete" title="Törlés">
-                    🗑
-                </button>
-            </td>
+            <td style="color: #334155; font-size: 13px; font-weight: 500;">${item.note || '-'}</td>
+            <td style="white-space: nowrap;"><strong style="color: #0077b6;">👤 ${item.userName || 'Rendszer'}</strong></td>
         `;
         tbody.appendChild(row);
     });
@@ -1252,6 +1258,7 @@ function initDashboard() {
                         pump2State: Number(data.pump2State || 0),
                         pump2Type: data.pump2Type || "",
                         pump2Serial: data.pump2Serial || "",
+                        note: data.note || "",
                         userEmail: rawEmail,
                         userName: resolveDisplayName(rawName, rawEmail)
                     });
@@ -1445,8 +1452,8 @@ function renderTable() {
             <td><span style="color: #64748b; font-size: 14px; font-weight: 600;">${item.prevKwhText}</span></td>
             <td><strong style="color: #0f172a; font-size: 15px;">${item.currKwhText}</strong></td>
             <td>${item.diffBadge}</td>
-            <td><strong style="color: #0077b6;">👤 ${item.userName}</strong></td>
-            <td>${item.note}</td>
+            <td style="color: #334155; font-size: 13px; font-weight: 500;">${item.note}</td>
+            <td style="white-space: nowrap;"><strong style="color: #0077b6;">👤 ${item.userName}</strong></td>
             <td style="text-align: center; white-space: nowrap;">
                 <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-icon-history" title="Előzmények megtekintése" style="background: #e0f2fe; color: #0284c7; border: 1.5px solid #0284c7; border-radius: 8px; padding: 6px 14px; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; min-height: 42px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: all 0.2s ease;">📜</button>
             </td>
@@ -2090,8 +2097,8 @@ function filterHistoryModalByDate() {
     const seenKeys = new Set();
 
     rawList.forEach(item => {
-        const displayKwhVal = item.dayKwh > 0 ? item.dayKwh : item.prevDayKwh;
-        // Group strictly by dateString so exactly 1 rolled-over entry per month appears in the history modal
+        // Display the rolled-over number that moved to Előző Óraállás
+        const displayKwhVal = (item.dayKwh && item.dayKwh > 0) ? item.dayKwh : item.prevDayKwh;
         const key = `${item.dateString}_${Math.round(displayKwhVal)}`;
         if (!seenKeys.has(key)) {
             seenKeys.add(key);
@@ -2193,6 +2200,76 @@ function deleteSingleHistoryRecord(recordId, town, street) {
             console.error("Firebase error:", e);
         }
     }
+}
+
+function openAddHistoricalRecordModal() {
+    if (!currentHistoryTown || !currentHistoryStreet) return;
+
+    const subEl = document.getElementById('addHistoryRecordSubtitle');
+    if (subEl) subEl.textContent = `${currentHistoryTown} • ${currentHistoryStreet}`;
+
+    const kwhEl = document.getElementById('addHistoryKwh');
+    const dateEl = document.getElementById('addHistoryDateString');
+    const userEl = document.getElementById('addHistoryUserName');
+    const noteEl = document.getElementById('addHistoryNote');
+
+    if (kwhEl) kwhEl.value = '';
+    if (dateEl) dateEl.value = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+    if (userEl) userEl.value = getLoggedInAdminName();
+    if (noteEl) noteEl.value = '';
+
+    const modal = document.getElementById('addHistoryRecordModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAddHistoryRecordModal() {
+    const modal = document.getElementById('addHistoryRecordModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function saveNewHistoricalRecordFromWeb() {
+    if (!currentHistoryTown || !currentHistoryStreet) return;
+
+    const kwhVal = document.getElementById('addHistoryKwh') ? document.getElementById('addHistoryKwh').value.trim() : '';
+    const dateStr = document.getElementById('addHistoryDateString') ? document.getElementById('addHistoryDateString').value.trim() : '';
+    const userName = document.getElementById('addHistoryUserName') ? document.getElementById('addHistoryUserName').value.trim() : getLoggedInAdminName();
+    const noteText = document.getElementById('addHistoryNote') ? document.getElementById('addHistoryNote').value.trim() : '';
+
+    const numKwh = kwhVal !== '' ? Number(kwhVal) : 0;
+    if (isNaN(numKwh) || numKwh <= 0) {
+        alert("Kérjük adj meg egy érvényes leolvasott óraállást!");
+        return;
+    }
+
+    const timestampNow = Date.now();
+    const archiveId = `hist_${currentHistoryTown}_${currentHistoryStreet}_${timestampNow}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+
+    const archivePayload = {
+        id: archiveId,
+        settlementName: currentHistoryTown,
+        meterName: currentHistoryStreet,
+        dayKwh: 0,
+        prevDayKwh: numKwh,
+        dateString: dateStr,
+        userName: userName,
+        userEmail: getLoggedInAdminEmail(),
+        note: noteText,
+        timestamp: timestampNow
+    };
+
+    electricityReadings.unshift(archivePayload);
+
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("electricity_readings").doc(archiveId).set(archivePayload, { merge: true });
+        } catch (e) {}
+    }
+
+    closeAddHistoryRecordModal();
+    openHistoryModal(currentHistoryTown, currentHistoryStreet);
+    renderTable();
+    alert("➕ Sikeresen hozzáadva az új korábbi előzmény leolvasás!");
 }
 
 function deleteAllHistoryForCurrentStreet() {

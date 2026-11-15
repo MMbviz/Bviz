@@ -237,11 +237,11 @@
                 <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')">
                     ⚡ Villanyórák Nyilvántartása
                 </button>
-                <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')">
-                    🚛 Takarítási Nyilvántartás
-                </button>
                 <button id="webTabPump" class="web-tab-button" onclick="switchWebTab('pump')">
                     🛠️ Szivattyú Nyilvántartás
+                </button>
+                <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')">
+                    🚛 Takarítási Nyilvántartás
                 </button>
             </div>
             <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -308,8 +308,8 @@
                                 <th style="width: 11%;">Előző Óraállás</th>
                                 <th style="width: 11%;">Óraállás</th>
                                 <th style="width: 11%;">Különbség</th>
-                                <th style="width: 12%;">Rögzítő Neve</th>
-                                <th style="width: 9%;">Megjegyzés</th>
+                                <th style="width: 11%;">📝 Megjegyzés</th>
+                                <th style="width: 10%; white-space: nowrap;">👤 Rögzítő Neve</th>
                                 <th style="width: 5%; text-align: center;">Műveletek</th>
                             </tr>
                         </thead>
@@ -439,12 +439,12 @@
                         <thead>
                             <tr>
                                 <th style="width: 12%;">Karbantartás Dátuma</th>
-                                <th style="width: 11%;">Település</th>
-                                <th style="width: 16%;">Utca</th>
-                                <th style="width: 23%;">⚙️ Első Szivattyú</th>
-                                <th style="width: 23%;">⚙️ Második Szivattyú</th>
-                                <th style="width: 10%;">Rögzítő Neve</th>
-                                <th style="width: 5%; text-align: center;">Műveletek</th>
+                                <th style="width: 10%;">Település</th>
+                                <th style="width: 15%;">Utca</th>
+                                <th style="width: 20%;">⚙️ Első Szivattyú</th>
+                                <th style="width: 20%;">⚙️ Második Szivattyú</th>
+                                <th style="width: 13%;">📝 Megjegyzés</th>
+                                <th style="width: 10%; white-space: nowrap;">👤 Rögzítő Neve</th>
                             </tr>
                         </thead>
                         <tbody id="pumpTableBody">
@@ -595,19 +595,19 @@
             </div>
             <p id="historyModalSubtitle" style="color: #475569; font-size: 14px; margin-top: -8px; margin-bottom: 12px; font-weight: 600;"></p>
 
-            <!-- Year and Month Search / Filter Bar -->
-            <div style="display: flex; gap: 12px; align-items: center; margin-bottom: 16px; background: #f8fafc; padding: 10px 14px; border-radius: 10px; border: 1px solid #e2e8f0; flex-wrap: wrap;">
-                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 6px;">
-                    <span onclick="triggerCalendarPicker()" title="Kattints a naptár ikonra bármelyik év és hónap kiválasztásához!" style="cursor: pointer; font-size: 15px; background: #e0f2fe; color: #0284c7; padding: 4px 10px; border-radius: 6px; border: 1px solid #7dd3fc; user-select: none;">📅 Év:</span>
-                    <select id="historyYearFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff;">
+            <!-- Year and Month Search / Filter Bar + Add New History Button in 1 Single Line -->
+            <div style="display: flex; gap: 8px; align-items: center; justify-content: flex-start; margin-bottom: 16px; background: #f8fafc; padding: 10px 12px; border-radius: 10px; border: 1px solid #e2e8f0; flex-wrap: nowrap;">
+                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
+                    <span onclick="triggerCalendarPicker()" title="Kattints a naptár ikonra bármelyik év és hónap kiválasztásához!" style="cursor: pointer; font-size: 14px; background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 6px; border: 1px solid #7dd3fc; user-select: none;">📅 Év:</span>
+                    <select id="historyYearFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff; font-size: 13px;">
                         <option value="ALL">Minden Év</option>
                     </select>
                     <input type="date" id="historyCalendarPicker" onchange="onCalendarDatePicked(this.value)" style="display: none;">
                 </label>
 
-                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 6px;">
+                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 4px; white-space: nowrap; margin-left: 4px;">
                     🗓 Hónap:
-                    <select id="historyMonthFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 10px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff;">
+                    <select id="historyMonthFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff; font-size: 13px;">
                         <option value="ALL">Minden Hónap</option>
                         <option value="01">Január (01)</option>
                         <option value="02">Február (02)</option>
@@ -623,6 +623,10 @@
                         <option value="12">December (12)</option>
                     </select>
                 </label>
+
+                <button onclick="openAddHistoricalRecordModal()" title="Adj hozzá kézzel egy új korábbi leolvasási előzményt ehhez az utcához!" style="background: #15803d; color: #ffffff; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; margin-left: 6px;">
+                    ➕ Új Előzmény
+                </button>
             </div>
             <div style="max-height: 360px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
                 <table class="data-table" style="width: 100%; table-layout: auto;">
@@ -670,6 +674,34 @@
             <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
                 <button onclick="closeEditHistoryRecordModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
                 <button onclick="saveEditHistoryRecordFromWeb()" style="background: #0077b6; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mentés</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add New Historical Record Modal -->
+    <div id="addHistoryRecordModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 10001;">
+        <div style="background: #ffffff; padding: 28px 24px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 440px; border-top: 5px solid #15803d;">
+            <h2 style="color: #15803d; margin-bottom: 6px; font-size: 20px;">➕ Új Korábbi Előzmény Hozzáadása</h2>
+            <p id="addHistoryRecordSubtitle" style="color: #475569; font-size: 13px; margin-top: 0; margin-bottom: 16px; font-weight: 600;"></p>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Leolvasott Óraállás (kWh)</label>
+                <input type="number" id="addHistoryKwh" step="1" required placeholder="pl. 8797" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #15803d; font-size: 16px; font-weight: bold; color: #15803d; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Leolvasás Dátuma</label>
+                <input type="text" id="addHistoryDateString" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 12px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Rögzítő Neve</label>
+                <input type="text" id="addHistoryUserName" style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; margin-bottom: 4px; color: #333;">Megjegyzés</label>
+                <input type="text" id="addHistoryNote" placeholder="Opcionális megjegyzés..." style="width: 100%; padding: 10px; border-radius: 6px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px;">
+                <button onclick="closeAddHistoryRecordModal()" style="background: #e0e0e0; color: #333; border: none; padding: 10px 18px; border-radius: 6px; font-weight: bold; cursor: pointer;">Mégse</button>
+                <button onclick="saveNewHistoricalRecordFromWeb()" style="background: #15803d; color: white; border: none; padding: 10px 22px; border-radius: 6px; font-weight: bold; cursor: pointer;">Hozzáadás</button>
             </div>
         </div>
     </div>
