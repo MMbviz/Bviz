@@ -157,6 +157,7 @@ function switchWebTab(tabName) {
     const secClean = document.getElementById('cleaningSection');
     const secPump = document.getElementById('pumpSection');
     const primaryBtn = document.getElementById('webPrimaryActionButton');
+    const rolloverBtn = document.getElementById('webRolloverBtn');
 
     if (tabName === 'cleaning') {
         if (tabElec) tabElec.classList.remove('active');
@@ -165,6 +166,7 @@ function switchWebTab(tabName) {
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'block';
         if (secPump) secPump.style.display = 'none';
+        if (rolloverBtn) rolloverBtn.style.display = 'none';
         if (primaryBtn) {
             primaryBtn.innerHTML = '➕ Új Takarítás';
             primaryBtn.onclick = openAddCleaningModal;
@@ -178,6 +180,7 @@ function switchWebTab(tabName) {
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'block';
+        if (rolloverBtn) rolloverBtn.style.display = 'none';
         if (primaryBtn) {
             primaryBtn.innerHTML = '➕ Új Szivattyú Adat';
             primaryBtn.onclick = openAddPumpModal;
@@ -191,6 +194,7 @@ function switchWebTab(tabName) {
         if (secElec) secElec.style.display = 'block';
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'none';
+        if (rolloverBtn) rolloverBtn.style.display = 'inline-flex';
         if (primaryBtn) {
             primaryBtn.innerHTML = '➕ Új Leolvasás';
             primaryBtn.onclick = openAddElectricityModal;
@@ -472,40 +476,66 @@ function deleteReadingFromWeb(docId) {
 
 function exportToExcel() {
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
-    const filtered = plantFilter === 'ALL' ? electricityReadings : electricityReadings.filter(r => (r.settlementName || '').trim().toLowerCase() === plantFilter.trim().toLowerCase());
 
-    const sortedAsc = [...filtered].sort((a, b) => {
-        if (a.dateString !== b.dateString) {
-            return a.dateString.localeCompare(b.dateString);
-        }
-        return (a.timestamp || 0) - (b.timestamp || 0);
+    const townsToInclude = (plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter])
+        .sort((a, b) => a.localeCompare(b, 'hu'));
+
+    let exportRows = [];
+
+    townsToInclude.forEach(town => {
+        const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+        streets.forEach(street => {
+            const normTown = normalizeStreetName(town);
+            const normStreet = normalizeStreetName(street);
+
+            const sameMeterReadings = electricityReadings.filter(r =>
+                normalizeStreetName(r.settlementName) === normTown &&
+                normalizeStreetName(r.meterName) === normStreet
+            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
+            const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
+
+            let prevKwhVal = '-';
+            let currKwhVal = '-';
+
+            if (latestReading) {
+                const baselinePrev = (latestReading.prevDayKwh && latestReading.prevDayKwh > 0)
+                    ? latestReading.prevDayKwh
+                    : ((previousReading && previousReading.dayKwh > 0) ? previousReading.dayKwh : null);
+
+                if (baselinePrev !== null && baselinePrev > 0) {
+                    prevKwhVal = Math.round(baselinePrev).toString();
+                }
+
+                if (latestReading.dayKwh > 0) {
+                    currKwhVal = Math.round(latestReading.dayKwh).toString();
+                }
+            }
+
+            exportRows.push({
+                town: town,
+                street: street,
+                prevKwhVal: prevKwhVal,
+                currKwhVal: currKwhVal
+            });
+        });
     });
-    const sortedDesc = [...sortedAsc].reverse();
 
-    if (sortedDesc.length === 0) {
+    if (exportRows.length === 0) {
         alert("Nincs letölthető villanyóra leolvasási adat!");
         return;
     }
 
     let csvContent = "\uFEFF";
-    csvContent += "Leolvasás Dátuma;Város / Település;Utca / Helyszín;Óraállás (kWh);Fogyasztási Különbség (kWh);Rögzítő Neve;Megjegyzés\n";
+    csvContent += "Település;Utca;Előző óraállás;Óraállás\n";
 
-    sortedDesc.forEach((item) => {
-        const sameMeterReadings = sortedAsc.filter(r => (r.settlementName || '').trim().toLowerCase() === (item.settlementName || '').trim().toLowerCase() && (r.meterName || '').trim().toLowerCase() === (item.meterName || '').trim().toLowerCase());
-        const itemIdx = sameMeterReadings.findIndex(r => r.id === item.id);
-        const prev = itemIdx > 0 ? sameMeterReadings[itemIdx - 1] : null;
-
-        const diffKwh = prev ? (item.dayKwh - prev.dayKwh) : null;
-        const diffText = diffKwh !== null ? (diffKwh >= 0 ? '+' + diffKwh.toFixed(0) : diffKwh.toFixed(0)) : '0';
-
+    exportRows.forEach((item) => {
         const line = [
-            `"${item.dateString}"`,
-            `"${item.settlementName || 'Apaj'}"`,
-            `"${item.meterName || 'Helyszín'}"`,
-            `"${item.dayKwh}"`,
-            `"${diffText}"`,
-            `"${item.userName || 'Mizsei Márk'}"`,
-            `"${(item.note || '-').replace(/"/g, '""')}"`
+            `"${(item.town || '').replace(/"/g, '""')}"`,
+            `"${(item.street || '').replace(/"/g, '""')}"`,
+            `"${item.prevKwhVal}"`,
+            `"${item.currKwhVal}"`
         ].join(";");
 
         csvContent += line + "\n";
@@ -515,7 +545,7 @@ function exportToExcel() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `Bviz_Villanyorak_Leolvasasok_${plantFilter}_${dateStr}.csv`;
+    const fileName = `Bviz_Villanyora_Allasok_${dateStr}.csv`;
 
     link.setAttribute("href", url);
     link.setAttribute("download", fileName);
@@ -539,73 +569,441 @@ function resolveDisplayName(rawName, rawEmail) {
     return "Mizsei Márk";
 }
 
+let cleaningViewMode = 'overview'; // 'overview' (Állapot áttekintő) or 'history' (Teljes előzménynapló)
+let currentHistoryLocationKey = null;
+
+let currentElectricityPage = 1;
+let currentCleaningPage = 1;
+let currentPumpPage = 1;
+
+const TRUCK_SVG_ICON = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: -2px; margin-right: 4px;"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>`;
+
+function getPageNumbers(currentPage, totalPages) {
+    if (totalPages <= 7) {
+        const pages = [];
+        for (let i = 1; i <= totalPages; i++) pages.push(i);
+        return pages;
+    }
+    const pages = [1];
+    if (currentPage > 3) {
+        pages.push('...');
+    }
+    const start = Math.max(2, currentPage - 1);
+    const end = Math.min(totalPages - 1, currentPage + 1);
+    for (let i = start; i <= end; i++) {
+        if (!pages.includes(i)) pages.push(i);
+    }
+    if (currentPage < totalPages - 2) {
+        pages.push('...');
+    }
+    if (!pages.includes(totalPages)) {
+        pages.push(totalPages);
+    }
+    return pages;
+}
+
+function buildPaginationControls(containerId, summaryElId, currentPage, totalItems, pageSize, onPageChange, itemLabelPlural = 'bejegyzés') {
+    const container = document.getElementById(containerId);
+    const summaryEl = document.getElementById(summaryElId);
+
+    const size = parseInt(pageSize, 10) || 25;
+    const totalPages = Math.ceil(totalItems / size) || 1;
+
+    let validPage = currentPage;
+    if (validPage > totalPages) validPage = totalPages;
+    if (validPage < 1) validPage = 1;
+
+    const startIndex = totalItems === 0 ? 0 : (validPage - 1) * size + 1;
+    const endIndex = Math.min(validPage * size, totalItems);
+
+    if (summaryEl) {
+        if (totalItems === 0) {
+            summaryEl.textContent = `Összesen: 0 ${itemLabelPlural}`;
+        } else {
+            summaryEl.textContent = `Megjelenítve: ${startIndex}–${endIndex} / ${totalItems} ${itemLabelPlural}`;
+        }
+    }
+
+    if (!container) return { startIndex: totalItems === 0 ? 0 : (validPage - 1) * size, endIndex, validPage };
+
+    container.innerHTML = '';
+
+    if (totalPages <= 1) {
+        return { startIndex: totalItems === 0 ? 0 : (validPage - 1) * size, endIndex, validPage };
+    }
+
+    // Previous Button
+    const prevBtn = document.createElement('button');
+    prevBtn.className = 'page-btn';
+    prevBtn.innerHTML = '‹ Előző';
+    prevBtn.disabled = validPage === 1;
+    prevBtn.onclick = () => onPageChange(validPage - 1);
+    container.appendChild(prevBtn);
+
+    // Page Number Buttons
+    const pageNumbers = getPageNumbers(validPage, totalPages);
+    pageNumbers.forEach(p => {
+        if (p === '...') {
+            const span = document.createElement('span');
+            span.className = 'page-ellipsis';
+            span.textContent = '...';
+            container.appendChild(span);
+        } else {
+            const pageBtn = document.createElement('button');
+            pageBtn.className = 'page-btn' + (p === validPage ? ' active' : '');
+            pageBtn.textContent = p;
+            pageBtn.onclick = () => onPageChange(p);
+            container.appendChild(pageBtn);
+        }
+    });
+
+    // Next Button
+    const nextBtn = document.createElement('button');
+    nextBtn.className = 'page-btn';
+    nextBtn.innerHTML = 'Következő ›';
+    nextBtn.disabled = validPage === totalPages;
+    nextBtn.onclick = () => onPageChange(validPage + 1);
+    container.appendChild(nextBtn);
+
+    return { startIndex: (validPage - 1) * size, endIndex, validPage };
+}
+
+function setCleaningViewMode(mode) {
+    currentCleaningPage = 1;
+    cleaningViewMode = mode;
+    const btnOverview = document.getElementById('cleaningViewOverview');
+    const btnHistory = document.getElementById('cleaningViewHistory');
+    if (btnOverview && btnHistory) {
+        if (mode === 'overview') {
+            btnOverview.style.background = '#0077b6';
+            btnOverview.style.color = '#ffffff';
+            btnHistory.style.background = 'transparent';
+            btnHistory.style.color = '#64748b';
+        } else {
+            btnHistory.style.background = '#0077b6';
+            btnHistory.style.color = '#ffffff';
+            btnOverview.style.background = 'transparent';
+            btnOverview.style.color = '#64748b';
+        }
+    }
+    renderCleaningTable();
+}
+
+function calculateCleaningDaysAgo(timestamp, dateString) {
+    const nowMs = Date.now();
+    if (timestamp && timestamp > 0) {
+        const diff = nowMs - timestamp;
+        const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+        return days < 0 ? 0 : days;
+    }
+    if (dateString) {
+        const clean = dateString.replace(/[^\d]/g, ' ');
+        const parts = clean.trim().split(/\s+/);
+        if (parts.length >= 3) {
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10) - 1;
+            const d = parseInt(parts[2], 10);
+            const parsed = new Date(y, m, d).getTime();
+            if (!isNaN(parsed)) {
+                const diff = nowMs - parsed;
+                const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+                return days < 0 ? 0 : days;
+            }
+        }
+    }
+    return 0;
+}
+
+function getCleaningStatusBadgeHTML(daysAgo) {
+    if (daysAgo <= 30) {
+        const text = daysAgo === 0 ? 'Rendben - Ma' : `Rendben - ${daysAgo} napja`;
+        return `<span class="badge-status badge-ok">✓ ${text}</span>`;
+    } else if (daysAgo <= 60) {
+        return `<span class="badge-status badge-warning">⚡ Közeleg - ${daysAgo} napja</span>`;
+    } else {
+        return `<span class="badge-status badge-overdue">⚠️ Esedékes - ${daysAgo} napja</span>`;
+    }
+}
+
+function openLocationCleaningHistoryModal(groupKey) {
+    currentHistoryLocationKey = groupKey;
+    const modal = document.getElementById('locationCleaningHistoryModal');
+    const titleEl = document.getElementById('locationCleaningHistoryTitle');
+    const subtitleEl = document.getElementById('locationCleaningHistorySubtitle');
+    const tbody = document.getElementById('locationCleaningHistoryTableBody');
+
+    if (!modal || !tbody) return;
+    tbody.innerHTML = '';
+
+    const records = cleaningRecords.filter(r => `${normalizeStreetName(r.settlementName)}_${normalizeStreetName(r.streetName)}` === groupKey);
+    records.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+
+    if (records.length > 0) {
+        if (titleEl) titleEl.innerHTML = `${TRUCK_SVG_ICON} ${records[0].settlementName} • ${records[0].streetName}`;
+        if (subtitleEl) subtitleEl.textContent = `Összesen ${records.length} korábbi takarítás rögzítve`;
+    }
+
+    records.forEach(rec => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.title = 'Duplán kattintva szerkesztheted ezt a korábbi takarítási adatot!';
+        row.ondblclick = () => {
+            openCleaningEditModal(rec.id);
+            closeLocationCleaningHistoryModal();
+        };
+        row.innerHTML = `
+            <td><strong>${rec.dateString}</strong></td>
+            <td><strong style="color: #0077b6; white-space: nowrap;">${rec.userName || 'Mizsei Márk'}</strong></td>
+            <td>${rec.note || '-'}</td>
+            <td style="text-align: center; white-space: nowrap;">
+                <button onclick="event.stopPropagation(); deleteCleaningRecordFromWeb('${rec.id}'); closeLocationCleaningHistoryModal();" class="btn-icon-delete" title="Törlés">🗑</button>
+            </td>
+        `;
+        tbody.appendChild(row);
+    });
+
+    modal.style.display = 'flex';
+}
+
+function closeLocationCleaningHistoryModal() {
+    const modal = document.getElementById('locationCleaningHistoryModal');
+    if (modal) modal.style.display = 'none';
+}
+
 function renderCleaningTable() {
     const tbody = document.getElementById('cleaningTableBody');
     const plantFilter = document.getElementById('cleaningPlantFilter') ? document.getElementById('cleaningPlantFilter').value : 'ALL';
+    const statusFilter = document.getElementById('cleaningStatusFilter') ? document.getElementById('cleaningStatusFilter').value : 'ALL';
     const searchQuery = document.getElementById('cleaningSearch') ? document.getElementById('cleaningSearch').value.trim().toLowerCase() : '';
     const pageSizeVal = document.getElementById('cleaningPageSize') ? document.getElementById('cleaningPageSize').value : '25';
 
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    let filtered = plantFilter === 'ALL'
-        ? cleaningRecords
-        : cleaningRecords.filter(r => normalizeStreetName(r.settlementName) === normalizeStreetName(plantFilter));
-
-    if (searchQuery) {
-        filtered = filtered.filter(r =>
-            (r.settlementName || '').toLowerCase().includes(searchQuery) ||
-            (r.streetName || '').toLowerCase().includes(searchQuery) ||
-            (r.userName || '').toLowerCase().includes(searchQuery) ||
-            (r.dateString || '').toLowerCase().includes(searchQuery) ||
-            (r.note || '').toLowerCase().includes(searchQuery)
-        );
-    }
-
-    const sortedDesc = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-    const totalCount = sortedDesc.length;
-
-    const summaryCountEl = document.getElementById('cleaningSummaryCount');
-    if (summaryCountEl) {
-        summaryCountEl.textContent = `Összesen: ${totalCount} bejegyzés`;
-    }
-
-    let displayList = sortedDesc;
-    if (pageSizeVal !== 'ALL') {
-        const size = parseInt(pageSizeVal, 10) || 50;
-        displayList = sortedDesc.slice(0, size);
-    }
-
-    if (displayList.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="6" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Még nincs rögzített takarítási adat. Hozz létre egyet az applikáció 🚛 Takarítás fülén!</td>`;
-        tbody.appendChild(row);
-        return;
-    }
-
-    displayList.forEach((item) => {
-        const row = document.createElement('tr');
-        row.style.cursor = 'pointer';
-        row.title = 'Kattints a sorra a szerkesztéshez!';
-        row.onclick = (e) => {
-            if (e.target.tagName !== 'BUTTON') {
-                openCleaningEditModal(item.id);
-            }
-        };
-        row.innerHTML = `
-            <td><strong>${item.dateString}</strong></td>
-            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">🚛 ${item.settlementName || 'Apaj'}</span></td>
-            <td><strong>${item.streetName || 'Helyszín'}</strong></td>
-            <td><strong style="color: #0077b6;">👤 ${item.userName || 'Mizsei Márk'}</strong></td>
-            <td>${item.note || '-'}</td>
-            <td style="text-align: center; white-space: nowrap;">
-                <button onclick="deleteCleaningRecordFromWeb('${item.id}')" class="btn-icon-delete" title="Törlés">
-                    🗑
-                </button>
-            </td>
-        `;
-        tbody.appendChild(row);
+    // Group all cleaning records by location
+    const groupedMap = new Map();
+    cleaningRecords.forEach(r => {
+        const key = `${normalizeStreetName(r.settlementName)}_${normalizeStreetName(r.streetName)}`;
+        if (!groupedMap.has(key)) {
+            groupedMap.set(key, []);
+        }
+        groupedMap.get(key).push(r);
     });
+
+    const allGroupedLocations = [];
+    groupedMap.forEach((records, key) => {
+        const sortedHistory = [...records].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
+        const latest = sortedHistory[0];
+        const daysAgo = calculateCleaningDaysAgo(latest.timestamp, latest.dateString);
+        let status = 'OK';
+        if (daysAgo > 60) status = 'OVERDUE';
+        else if (daysAgo >= 31) status = 'WARNING';
+
+        allGroupedLocations.push({
+            key: key,
+            settlementName: latest.settlementName || 'Apaj',
+            streetName: latest.streetName || 'Helyszín',
+            latestRecord: latest,
+            daysAgo: daysAgo,
+            status: status,
+            historyRecords: sortedHistory
+        });
+    });
+
+    // Update summary stat cards
+    const statTotalEl = document.getElementById('statTotalLocations');
+    const statOkEl = document.getElementById('statOkLocations');
+    const statOverdueEl = document.getElementById('statOverdueLocations');
+
+    if (statTotalEl) statTotalEl.textContent = allGroupedLocations.length;
+    if (statOkEl) statOkEl.textContent = allGroupedLocations.filter(loc => loc.status === 'OK').length;
+    if (statOverdueEl) statOverdueEl.textContent = allGroupedLocations.filter(loc => loc.status === 'OVERDUE').length;
+
+    // Update table header row based on view mode
+    const headerRow = document.getElementById('cleaningTableHeaderRow');
+    if (headerRow) {
+        if (cleaningViewMode === 'overview') {
+            headerRow.innerHTML = `
+                <th style="width: 14%;">Utolsó Takarítás</th>
+                <th style="width: 15%;">Állapot</th>
+                <th style="width: 14%;">Település</th>
+                <th style="width: 18%;">Utca / Helyszín</th>
+                <th style="width: 21%;">Megjegyzés</th>
+                <th style="width: 14%;">Rögzítő Neve</th>
+                <th style="width: 9%; text-align: center;">Műveletek</th>
+            `;
+        } else {
+            headerRow.innerHTML = `
+                <th style="width: 14%;">Takarítás Dátuma</th>
+                <th style="width: 15%;">Állapot</th>
+                <th style="width: 14%;">Település</th>
+                <th style="width: 18%;">Utca / Helyszín</th>
+                <th style="width: 21%;">Megjegyzés</th>
+                <th style="width: 14%;">Rögzítő Neve</th>
+                <th style="width: 9%; text-align: center;">Műveletek</th>
+            `;
+        }
+    }
+
+    if (cleaningViewMode === 'overview') {
+        // --- OVERVIEW MODE ---
+        let filtered = allGroupedLocations;
+
+        if (plantFilter !== 'ALL') {
+            filtered = filtered.filter(loc => normalizeStreetName(loc.settlementName) === normalizeStreetName(plantFilter));
+        }
+
+        if (statusFilter !== 'ALL') {
+            filtered = filtered.filter(loc => loc.status === statusFilter);
+        }
+
+        if (searchQuery) {
+            filtered = filtered.filter(loc =>
+                (loc.settlementName || '').toLowerCase().includes(searchQuery) ||
+                (loc.streetName || '').toLowerCase().includes(searchQuery) ||
+                (loc.latestRecord.userName || '').toLowerCase().includes(searchQuery) ||
+                (loc.latestRecord.dateString || '').toLowerCase().includes(searchQuery) ||
+                (loc.latestRecord.note || '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        // Default sort: Overdue (>60 days) at the top!
+        // OVERDUE (3) > WARNING (2) > OK (1), then by daysAgo descending
+        filtered.sort((a, b) => {
+            const priorityMap = { OVERDUE: 3, WARNING: 2, OK: 1 };
+            const pDiff = (priorityMap[b.status] || 0) - (priorityMap[a.status] || 0);
+            if (pDiff !== 0) return pDiff;
+            return b.daysAgo - a.daysAgo;
+        });
+
+        const totalCount = filtered.length;
+        const { startIndex, endIndex, validPage } = buildPaginationControls(
+            'cleaningPaginationControls',
+            'cleaningSummaryCount',
+            currentCleaningPage,
+            totalCount,
+            pageSizeVal,
+            (newPage) => {
+                currentCleaningPage = newPage;
+                renderCleaningTable();
+            },
+            'átemelő helyszín'
+        );
+        currentCleaningPage = validPage;
+
+        const displayList = filtered.slice(startIndex, endIndex);
+
+        if (displayList.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="7" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Nincs a szűrésnek megfelelő takarítási adat.</td>`;
+            tbody.appendChild(row);
+            return;
+        }
+
+        displayList.forEach(loc => {
+            const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.title = 'Kattints a helyszínre az összes előzmény megtekintéséhez!';
+            row.onclick = (e) => {
+                if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                    openLocationCleaningHistoryModal(loc.key);
+                }
+            };
+            row.innerHTML = `
+                <td><strong>${loc.latestRecord.dateString}</strong></td>
+                <td>${getCleaningStatusBadgeHTML(loc.daysAgo)}</td>
+                <td><span class="settlement-badge">${TRUCK_SVG_ICON}${loc.settlementName}</span></td>
+                <td><strong>${loc.streetName}</strong></td>
+                <td>${loc.latestRecord.note || '-'}</td>
+                <td style="white-space: nowrap;"><strong style="color: #0077b6;">${loc.latestRecord.userName || 'Mizsei Márk'}</strong></td>
+                <td style="text-align: center; white-space: nowrap;">
+                    <button onclick="openLocationCleaningHistoryModal('${loc.key}')" class="btn-icon-edit" style="width: auto; padding: 4px 10px; font-weight: bold; font-size: 12px; height: auto;" title="Előzmények megtekintése">
+                        📝 ${loc.historyRecords.length} előzmény
+                    </button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+
+    } else {
+        // --- HISTORY LOG MODE ---
+        let filtered = cleaningRecords.map(r => {
+            const daysAgo = calculateCleaningDaysAgo(r.timestamp, r.dateString);
+            let status = 'OK';
+            if (daysAgo > 60) status = 'OVERDUE';
+            else if (daysAgo >= 31) status = 'WARNING';
+            return { record: r, daysAgo: daysAgo, status: status };
+        });
+
+        if (plantFilter !== 'ALL') {
+            filtered = filtered.filter(item => normalizeStreetName(item.record.settlementName) === normalizeStreetName(plantFilter));
+        }
+
+        if (statusFilter !== 'ALL') {
+            filtered = filtered.filter(item => item.status === statusFilter);
+        }
+
+        if (searchQuery) {
+            filtered = filtered.filter(item =>
+                (item.record.settlementName || '').toLowerCase().includes(searchQuery) ||
+                (item.record.streetName || '').toLowerCase().includes(searchQuery) ||
+                (item.record.userName || '').toLowerCase().includes(searchQuery) ||
+                (item.record.dateString || '').toLowerCase().includes(searchQuery) ||
+                (item.record.note || '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        filtered.sort((a, b) => (b.record.timestamp || 0) - (a.record.timestamp || 0));
+
+        const totalCount = filtered.length;
+        const { startIndex, endIndex, validPage } = buildPaginationControls(
+            'cleaningPaginationControls',
+            'cleaningSummaryCount',
+            currentCleaningPage,
+            totalCount,
+            pageSizeVal,
+            (newPage) => {
+                currentCleaningPage = newPage;
+                renderCleaningTable();
+            },
+            'bejegyzés'
+        );
+        currentCleaningPage = validPage;
+
+        const displayList = filtered.slice(startIndex, endIndex);
+
+        if (displayList.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="7" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Még nincs rögzített takarítási bejegyzés.</td>`;
+            tbody.appendChild(row);
+            return;
+        }
+
+        displayList.forEach(item => {
+            const rec = item.record;
+            const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.title = 'Kattints a bejegyzésre a szerkesztéshez!';
+            row.onclick = (e) => {
+                if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
+                    openCleaningEditModal(rec.id);
+                }
+            };
+            row.innerHTML = `
+                <td><strong>${rec.dateString}</strong></td>
+                <td>${getCleaningStatusBadgeHTML(item.daysAgo)}</td>
+                <td><span class="settlement-badge">${TRUCK_SVG_ICON}${rec.settlementName || 'Apaj'}</span></td>
+                <td><strong>${rec.streetName || 'Helyszín'}</strong></td>
+                <td>${rec.note || '-'}</td>
+                <td style="white-space: nowrap;"><strong style="color: #0077b6;">${rec.userName || 'Mizsei Márk'}</strong></td>
+                <td style="text-align: center; white-space: nowrap;">
+                    <button onclick="openCleaningEditModal('${rec.id}')" class="btn-icon-edit" title="Szerkesztés">✏️</button>
+                    <button onclick="deleteCleaningRecordFromWeb('${rec.id}')" class="btn-icon-delete" title="Törlés">🗑</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
 }
 
 function renderPumpStreetList() {
@@ -946,7 +1344,19 @@ function deletePumpRecordFromWeb(docId) {
 
 function exportCleaningToExcel() {
     const plantFilter = document.getElementById('cleaningPlantFilter') ? document.getElementById('cleaningPlantFilter').value : 'ALL';
-    const filtered = plantFilter === 'ALL' ? cleaningRecords : cleaningRecords.filter(r => normalizeStreetName(r.settlementName) === normalizeStreetName(plantFilter));
+    const statusFilter = document.getElementById('cleaningStatusFilter') ? document.getElementById('cleaningStatusFilter').value : 'ALL';
+
+    let filtered = plantFilter === 'ALL' ? cleaningRecords : cleaningRecords.filter(r => normalizeStreetName(r.settlementName) === normalizeStreetName(plantFilter));
+
+    if (statusFilter !== 'ALL') {
+        filtered = filtered.filter(r => {
+            const days = calculateCleaningDaysAgo(r.timestamp, r.dateString);
+            let status = 'OK';
+            if (days > 60) status = 'OVERDUE';
+            else if (days >= 31) status = 'WARNING';
+            return status === statusFilter;
+        });
+    }
 
     if (filtered.length === 0) {
         alert("Nincs letölthető takarítási adat!");
@@ -956,11 +1366,15 @@ function exportCleaningToExcel() {
     const sortedDesc = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     let csvContent = "\uFEFF";
-    csvContent += "Takarítás Dátuma;Város / Település;Utca / Helyszín;Rögzítő Neve;Megjegyzés\n";
+    csvContent += "Takarítás Dátuma;Állapot;Város / Település;Utca / Helyszín;Rögzítő Neve;Megjegyzés\n";
 
     sortedDesc.forEach((item) => {
+        const days = calculateCleaningDaysAgo(item.timestamp, item.dateString);
+        let statusText = days <= 30 ? `Rendben (${days} napja)` : (days <= 60 ? `Közeleg (${days} napja)` : `Esedékes (${days} napja)`);
+
         const line = [
             `"${item.dateString}"`,
+            `"${statusText}"`,
             `"${item.settlementName || 'Apaj'}"`,
             `"${item.streetName || 'Helyszín'}"`,
             `"${item.userName || 'Mizsei Márk'}"`,
@@ -983,35 +1397,125 @@ function exportCleaningToExcel() {
     document.body.removeChild(link);
 }
 
-function exportPumpToExcel() {
-    const plantFilter = document.getElementById('pumpPlantFilter') ? document.getElementById('pumpPlantFilter').value : 'ALL';
-    const filtered = plantFilter === 'ALL' ? pumpRecords : pumpRecords.filter(r => normalizeStreetName(r.settlementName) === normalizeStreetName(plantFilter));
+let selectedPumpStatusValue = 'ALL';
 
-    if (filtered.length === 0) {
+function togglePumpStatusDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('pumpCustomStatusMenu');
+    if (menu) {
+        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+    }
+}
+
+function selectPumpStatusOption(val) {
+    selectedPumpStatusValue = val;
+    const selectedSpan = document.getElementById('pumpCustomStatusSelected');
+    const menu = document.getElementById('pumpCustomStatusMenu');
+
+    if (selectedSpan) {
+        if (val === 'ALL') {
+            selectedSpan.innerHTML = 'Minden állapot';
+        } else if (val === '1') {
+            selectedSpan.innerHTML = '<span class="pump-pill-badge badge-working">● Üzemel</span>';
+        } else if (val === '2') {
+            selectedSpan.innerHTML = '<span class="pump-pill-badge badge-faulty">● Hibás</span>';
+        } else if (val === '0') {
+            selectedSpan.innerHTML = '<span class="pump-pill-badge badge-none">Nincs szivattyú</span>';
+        }
+    }
+
+    if (menu) menu.style.display = 'none';
+
+    currentPumpPage = 1;
+    renderPumpTable();
+}
+
+document.addEventListener('click', function(e) {
+    const dropdown = document.getElementById('pumpCustomStatusDropdown');
+    const menu = document.getElementById('pumpCustomStatusMenu');
+    if (dropdown && menu && !dropdown.contains(e.target)) {
+        menu.style.display = 'none';
+    }
+});
+
+function exportPumpToExcel() {
+    const townsToInclude = Object.keys(streetMapData).sort((a, b) => a.localeCompare(b, 'hu'));
+    let csvRows = [];
+
+    townsToInclude.forEach(town => {
+        const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+        streets.forEach(street => {
+            const existing = pumpRecords.find(r =>
+                normalizeStreetName(r.settlementName) === normalizeStreetName(town) &&
+                normalizeStreetName(r.streetName) === normalizeStreetName(street)
+            );
+
+            const dateStr = existing && existing.dateString ? existing.dateString : '2026. 11. 11.';
+            const noteText = existing && existing.note ? existing.note : '-';
+            const uploaderName = existing && existing.userName ? existing.userName : 'Rendszer';
+
+            const p1Type = existing && existing.pump1Type ? existing.pump1Type : '';
+            const p1Serial = existing && existing.pump1Serial ? existing.pump1Serial : '';
+            const p2Type = existing && existing.pump2Type ? existing.pump2Type : '';
+            const p2Serial = existing && existing.pump2Serial ? existing.pump2Serial : '';
+
+            const hasP1 = p1Type !== '' || p1Serial !== '' || (existing && existing.pump1State > 0);
+            const hasP2 = p2Type !== '' || p2Serial !== '' || (existing && existing.pump2State > 0);
+
+            if (hasP1 || hasP2) {
+                if (hasP1) {
+                    csvRows.push({
+                        town: town,
+                        street: street,
+                        type: p1Type || '-',
+                        serial: p1Serial || '-',
+                        dateStr: dateStr,
+                        note: noteText,
+                        uploader: uploaderName
+                    });
+                }
+                if (hasP2) {
+                    csvRows.push({
+                        town: town,
+                        street: street,
+                        type: p2Type || '-',
+                        serial: p2Serial || '-',
+                        dateStr: dateStr,
+                        note: noteText,
+                        uploader: uploaderName
+                    });
+                }
+            } else {
+                csvRows.push({
+                    town: town,
+                    street: street,
+                    type: '-',
+                    serial: '-',
+                    dateStr: dateStr,
+                    note: noteText,
+                    uploader: uploaderName
+                });
+            }
+        });
+    });
+
+    if (csvRows.length === 0) {
         alert("Nincs letölthető szivattyú adat!");
         return;
     }
 
-    const sortedDesc = [...filtered].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-
     let csvContent = "\uFEFF";
-    csvContent += "Rögzítés Dátuma;Város / Település;Utca / Helyszín;1. Szivattyú Állapot;1. Szivattyú Fajtája;1. Szivattyú Gyári Szám;2. Szivattyú Állapot;2. Szivattyú Fajtája;2. Szivattyú Gyári Szám;Rögzítő Neve\n";
+    csvContent += "Település;Utca / Átemelő;Szivattyú fajtája;Szivattyú gyári száma;Karbantartás dátuma;Megjegyzés;Rögzítő neve\n";
 
-    sortedDesc.forEach((item) => {
-        const p1Status = item.pump1State === 1 ? 'Működő' : (item.pump1State === 2 ? 'Rossz' : 'Nincs szivattyú');
-        const p2Status = item.pump2State === 1 ? 'Működő' : (item.pump2State === 2 ? 'Rossz' : 'Nincs szivattyú');
-
+    csvRows.forEach((item) => {
         const line = [
-            `"${item.dateString}"`,
-            `"${item.settlementName || 'Apaj'}"`,
-            `"${item.streetName || 'Helyszín'}"`,
-            `"${p1Status}"`,
-            `"${item.pump1Type || '-'}"`,
-            `"${item.pump1Serial || '-'}"`,
-            `"${p2Status}"`,
-            `"${item.pump2Type || '-'}"`,
-            `"${item.pump2Serial || '-'}"`,
-            `"${item.userName || 'Mizsei Márk'}"`
+            `"${(item.town || '').replace(/"/g, '""')}"`,
+            `"${(item.street || '').replace(/"/g, '""')}"`,
+            `"${(item.type || '-').replace(/"/g, '""')}"`,
+            `"${(item.serial || '-').replace(/"/g, '""')}"`,
+            `"${(item.dateStr || '-').replace(/"/g, '""')}"`,
+            `"${(item.note || '-').replace(/"/g, '""')}"`,
+            `"${(item.uploader || '-').replace(/"/g, '""')}"`
         ].join(";");
 
         csvContent += line + "\n";
@@ -1021,7 +1525,7 @@ function exportPumpToExcel() {
     const link = document.createElement("a");
     const url = URL.createObjectURL(blob);
     const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `Bviz_Szivattyu_Nyilvantartas_${plantFilter}_${dateStr}.csv`;
+    const fileName = `Szivattyu_Nyilvantartas_Teljes_${dateStr}.csv`;
 
     link.setAttribute("href", url);
     link.setAttribute("download", fileName);
@@ -1035,6 +1539,7 @@ function renderPumpTable() {
 
     const tbody = document.getElementById('pumpTableBody');
     const plantFilter = document.getElementById('pumpPlantFilter') ? document.getElementById('pumpPlantFilter').value : 'ALL';
+    const statusFilter = selectedPumpStatusValue || 'ALL';
     const searchQuery = document.getElementById('pumpSearch') ? document.getElementById('pumpSearch').value.trim().toLowerCase() : '';
     const pageSizeVal = document.getElementById('pumpPageSize') ? document.getElementById('pumpPageSize').value : 'ALL';
 
@@ -1073,6 +1578,11 @@ function renderPumpTable() {
         });
     });
 
+    if (statusFilter !== 'ALL') {
+        const targetState = parseInt(statusFilter, 10);
+        allStreetRows = allStreetRows.filter(r => (r.pump1State === targetState || r.pump2State === targetState));
+    }
+
     if (searchQuery) {
         allStreetRows = allStreetRows.filter(r =>
             (r.settlementName || '').toLowerCase().includes(searchQuery) ||
@@ -1087,16 +1597,21 @@ function renderPumpTable() {
     }
 
     const totalCount = allStreetRows.length;
-    const summaryCountEl = document.getElementById('pumpSummaryCount');
-    if (summaryCountEl) {
-        summaryCountEl.textContent = `Összesen: ${totalCount} bejegyzés`;
-    }
+    const { startIndex, endIndex, validPage } = buildPaginationControls(
+        'pumpPaginationControls',
+        'pumpSummaryCount',
+        currentPumpPage,
+        totalCount,
+        pageSizeVal,
+        (newPage) => {
+            currentPumpPage = newPage;
+            renderPumpTable();
+        },
+        'bejegyzés'
+    );
+    currentPumpPage = validPage;
 
-    let displayList = allStreetRows;
-    if (pageSizeVal !== 'ALL') {
-        const size = parseInt(pageSizeVal, 10) || 50;
-        displayList = allStreetRows.slice(0, size);
-    }
+    const displayList = allStreetRows.slice(startIndex, endIndex);
 
     if (displayList.length === 0) {
         const row = document.createElement('tr');
@@ -1134,7 +1649,7 @@ function renderPumpTable() {
             <td>${p1StatusBadge} ${p1Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p1Details + ')</span>' : ''}</td>
             <td>${p2StatusBadge} ${p2Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p2Details + ')</span>' : ''}</td>
             <td style="color: #334155; font-size: 13px; font-weight: 500;">${item.note || '-'}</td>
-            <td style="white-space: nowrap;"><strong style="color: #0077b6;">👤 ${item.userName || 'Rendszer'}</strong></td>
+            <td style="white-space: nowrap;"><strong style="color: #0077b6;">${item.userName || 'Rendszer'}</strong></td>
         `;
         tbody.appendChild(row);
     });
@@ -1382,16 +1897,21 @@ function renderTable() {
     }
 
     const totalCount = allElecRows.length;
-    const summaryCountEl = document.getElementById('electricitySummaryCount');
-    if (summaryCountEl) {
-        summaryCountEl.textContent = `Összesen: ${totalCount} bejegyzés`;
-    }
+    const { startIndex, endIndex, validPage } = buildPaginationControls(
+        'electricityPaginationControls',
+        'electricitySummaryCount',
+        currentElectricityPage,
+        totalCount,
+        pageSizeVal,
+        (newPage) => {
+            currentElectricityPage = newPage;
+            renderTable();
+        },
+        'bejegyzés'
+    );
+    currentElectricityPage = validPage;
 
-    let displayList = allElecRows;
-    if (pageSizeVal !== 'ALL') {
-        const size = parseInt(pageSizeVal, 10) || 50;
-        displayList = allElecRows.slice(0, size);
-    }
+    const displayList = allElecRows.slice(startIndex, endIndex);
 
     if (displayList.length === 0) {
         const row = document.createElement('tr');
@@ -1453,7 +1973,7 @@ function renderTable() {
             <td><strong style="color: #0f172a; font-size: 15px;">${item.currKwhText}</strong></td>
             <td>${item.diffBadge}</td>
             <td style="color: #334155; font-size: 13px; font-weight: 500;">${item.note}</td>
-            <td style="white-space: nowrap;"><strong style="color: #0077b6;">👤 ${item.userName}</strong></td>
+            <td style="white-space: nowrap;"><strong style="color: #0077b6;">${item.userName}</strong></td>
             <td style="text-align: center; white-space: nowrap;">
                 <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-icon-history" title="Előzmények megtekintése" style="background: #e0f2fe; color: #0284c7; border: 1.5px solid #0284c7; border-radius: 8px; padding: 6px 14px; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; min-height: 42px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: all 0.2s ease;">📜</button>
             </td>

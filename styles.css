@@ -21,14 +21,14 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    background: radial-gradient(circle at center, #0f2b48 0%, #08192b 60%, #040c17 100%);
+    background: linear-gradient(135deg, #1b5e20 0%, #2e7d32 60%, #388e3c 100%);
     padding: 18px 24px;
     border-radius: 16px;
-    box-shadow: 0 8px 24px rgba(0,0,0,0.35);
+    box-shadow: 0 8px 24px rgba(27,94,32,0.25);
     margin-bottom: 20px;
     flex-wrap: wrap;
     gap: 16px;
-    border: 1px solid rgba(255,255,255,0.15);
+    border: 1px solid rgba(255,255,255,0.2);
 }
 
 .header-left-buttons {
@@ -316,4 +316,202 @@ body {
     .subtitle {
         font-size: 13px;
     }
+}
+
+/* Unified Pagination Controls */
+.pagination-controls {
+    display: flex;
+    gap: 6px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: wrap;
+}
+
+.page-btn {
+    background: #ffffff;
+    color: #0f172a;
+    border: 1px solid #cbd5e1;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    user-select: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+
+.page-btn:hover:not(:disabled):not(.active) {
+    background: #f1f5f9;
+    border-color: #94a3b8;
+}
+
+.page-btn.active {
+    background: #15803d;
+    color: #ffffff !important;
+    border-color: #15803d !important;
+    box-shadow: 0 2px 6px rgba(21, 128, 61, 0.3);
+}
+
+.page-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    background: #f8fafc;
+    color: #94a3b8;
+    border-color: #e2e8f0;
+}
+
+.page-ellipsis {
+    color: #64748b;
+    font-weight: bold;
+    padding: 0 4px;
+    font-size: 13px;
+    user-select: none;
+}
+
+/* Dark Theme Overrides for Pagination */
+body.dark-theme .page-btn {
+    background: #080d19 !important;
+    color: #80deea !important;
+    border-color: #1a2333 !important;
+    box-shadow: none !important;
+}
+
+body.dark-theme .page-btn:hover:not(:disabled):not(.active) {
+    background: #101929 !important;
+    border-color: #0284c7 !important;
+}
+
+body.dark-theme .page-btn.active {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border-color: #0284c7 !important;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4) !important;
+}
+
+body.dark-theme .page-btn:disabled {
+    opacity: 0.35;
+    background: #040810 !important;
+    color: #475569 !important;
+    border-color: #1a2333 !important;
+}
+
+body.dark-theme .page-ellipsis {
+    color: #80deea !important;
+}
+
+/* Custom Dropdown Styling for Pump Status Filter */
+.custom-dropdown-btn {
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-weight: 600;
+    color: #0f172a;
+    background: #ffffff;
+    font-size: 14px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: space-between;
+    min-width: 145px;
+    height: 35px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.custom-dropdown-btn:hover {
+    border-color: #0077b6;
+}
+
+.custom-dropdown-menu {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    z-index: 1000;
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    padding: 6px;
+    min-width: 160px;
+    box-sizing: border-box;
+}
+
+.custom-dropdown-option {
+    padding: 8px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: background 0.15s ease;
+    display: flex;
+    align-items: center;
+    color: #0f172a;
+}
+
+.custom-dropdown-option:hover {
+    background: #f1f5f9;
+}
+
+.pump-pill-badge {
+    font-weight: 800;
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 11px;
+    color: #ffffff;
+    display: inline-block;
+    white-space: nowrap;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.15);
+}
+
+.pump-pill-badge.badge-working {
+    background: #15803d;
+}
+
+.pump-pill-badge.badge-faulty {
+    background: #dc2626;
+}
+
+.pump-pill-badge.badge-none {
+    background: #475569;
+}
+
+/* Dark Theme Overrides for Custom Dropdown */
+body.dark-theme .custom-dropdown-btn {
+    background: #040810 !important;
+    color: #ffffff !important;
+    border-color: #0284c7 !important;
+}
+
+body.dark-theme .custom-dropdown-menu {
+    background: #080d19 !important;
+    border-color: #0284c7 !important;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.8) !important;
+}
+
+body.dark-theme .custom-dropdown-option {
+    color: #ffffff !important;
+}
+
+body.dark-theme .custom-dropdown-option:hover {
+    background: #101929 !important;
+}
+
+/* Amber Rollover Button */
+#webRolloverBtn {
+    background: #f59e0b !important;
+    color: #0f172a !important;
+    border: none;
+    padding: 10px 18px;
+    border-radius: 8px;
+    font-weight: bold;
+    font-size: 14px;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s ease;
+}
+
+#webRolloverBtn:hover {
+    background: #d97706 !important;
 }
