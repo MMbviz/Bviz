@@ -9,6 +9,8 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <!-- SheetJS Excel (.xlsx) Library -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <style>
         .web-tab-bar {
             display: flex;
@@ -316,32 +318,50 @@
             <!-- Top Row: Left Tabs, Right Action Buttons -->
             <nav class="web-tab-bar" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div style="display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                    <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')">
+                    <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')" title="Szennyvíz-átemelők havi villanyóra-állásainak, fogyasztási különbségeinek és a leolvasási ciklus előrehaladásának megtekintése.">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66L12 3h1l-1 7h4.5c.58 0 .57.32.38.66L11 21z"/></svg>Villanyórák Nyilvántartása
                     </button>
-                    <button id="webTabPump" class="web-tab-button" onclick="switchWebTab('pump')">
+                    <button id="webTabPump" class="web-tab-button" onclick="switchWebTab('pump')" title="Átemelő-szivattyúk műszaki állapotának, gyáriszámai és karbantartási adatainak nyilvántartása.">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>Szivattyú Nyilvántartás
                     </button>
-                    <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')">
+                    <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')" title="Szennyvíz-átemelők rendszeres tisztítási, szippantási és takarítási naplójának megtekintése.">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>Takarítási Nyilvántartás
                     </button>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button id="webRolloverBtn" onclick="simulate5thRollover()" title="Szimuláld a hónap 5-i automatikus átgördülést!">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>Átgördülés
+                    <button id="webRolloverBtn" onclick="simulate5thRollover()" title="Havi zárás: az aktuális óraállások áthelyezése az Előző Óraállás oszlopba és az előzményekbe, majd új leolvasási ciklus indítása.">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>Havi zárás
                     </button>
-                    <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+                    <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Új szennyvíz-átemelő (település és utca) felvétele a rendszerbe — azonnal megjelenik a weboldalon és a telefonos alkalmazásban is.">
                         ➕ Új átemelő
                     </button>
-                    <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 6px;">
+                    <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 6px;" title="Meglévő átemelő (utca) végleges törlése az adatbázisból és az összes nyilvántartási fülről.">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Átemelő törlése
                     </button>
                 </div>
             </nav>
 
-            <!-- Second Row: Right-aligned Primary Data Input Button -->
-            <div style="display: flex; justify-content: flex-end; margin-top: 10px;">
-                <button id="webPrimaryActionButton" onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);">
+            <!-- Second Row: Left Monthly Progress Pill Badge, Right Primary Action Button -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 12px;">
+                <!-- Left: Compact Monthly Summary Pill Badge -->
+                <div id="havi-osszesito" class="havi-osszesito-badge">
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; gap: 14px; flex: 1;">
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" class="havi-icon" style="vertical-align: middle;"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zM16.2 13h2.8v6h-2.8z"/></svg>
+                            <span class="havi-main-text" style="font-size: 13px; font-weight: bold;">Havi: <span id="leolvasott-count" class="count-highlight">0</span> / <span id="osszes-count" class="count-total">0</span></span>
+                        </div>
+                        <div id="hatralevo-container" class="havi-secondary-text" style="font-size: 12px; font-weight: 600;">
+                            Még <span id="hatralevo-count" class="count-remaining">0</span> db
+                        </div>
+                    </div>
+                    <!-- Bottom 3px Progress Bar -->
+                    <div class="havi-progress-track" style="width: 100%; height: 3px; overflow: hidden; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                        <div id="haviProgressBar" class="progress-bar-inner" style="width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+                    </div>
+                </div>
+
+                <!-- Right: Primary Action Button -->
+                <button id="webPrimaryActionButton" onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); margin-left: auto;" title="Új villanyóra-állás rögzítése manuálisan a vezetői felületről — az adat azonnal frissül a rendszerben és a telefonos alkalmazásban is.">
                     ➕ Új Leolvasás
                 </button>
             </div>
@@ -369,8 +389,8 @@
                                 <option value="Kunpeszér">Kunpeszér</option>
                             </select>
                         </label>
-                        <button onclick="exportToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;">
-                            📄 Excel (.csv)
+                        <button onclick="exportToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="Valódi Excel (.xlsx) fájl letöltése az aktuálisan látható villanyóra-állásokkal: Település, Utca, Előző Óraállás és Óraállás oszlopokkal.">
+                            📄 Excel (.xlsx)
                         </button>
                     </div>
                 </div>
@@ -459,7 +479,7 @@
                                 <option value="OK">Rendben (0-30 nap)</option>
                             </select>
                         </label>
-                        <button onclick="exportCleaningToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;">
+                        <button onclick="exportCleaningToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="Az átemelő-takarítási napló letöltése Excel-kompatibilis CSV fájlként.">
                             📄 Excel (.csv)
                         </button>
                     </div>
@@ -547,7 +567,7 @@
                                 </div>
                             </div>
                         </label>
-                        <button onclick="exportPumpToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;">
+                        <button onclick="exportPumpToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="A szivattyú nyilvántartási adatok letöltése Excel-kompatibilis CSV fájlként.">
                             📄 Excel (.csv)
                         </button>
                     </div>
@@ -708,61 +728,72 @@
     </div>
 
     <!-- Reading History Modal -->
-    <div id="historyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); justify-content: center; align-items: center; z-index: 9999;">
-        <div style="background: #ffffff; padding: 28px 24px; border-radius: 14px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 600px; border-top: 5px solid #0077b6;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; flex-wrap: wrap; gap: 8px;">
-                <h2 style="color: #0077b6; font-size: 20px; margin: 0;">📜 Korábbi Óraállások Előzményei</h2>
-                <div style="display: flex; gap: 8px; align-items: center;">
-                    <button onclick="deleteAllHistoryForCurrentStreet()" title="Töröld ennek az utcának az ÖSSZES elmentett előzményét 1 kattintással!" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px;">
-                        🗑 Ennek az utcának az összes előzményének törlése
+    <div id="historyModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); justify-content: center; align-items: center; z-index: 9999; backdrop-filter: blur(4px);">
+        <div class="history-modal-content">
+            <!-- Two-Column Header: Left Title & Subtitle Badge | Right Buttons -->
+            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; margin-bottom: 16px;">
+                <div style="display: flex; flex-direction: column; gap: 6px;">
+                    <h2 class="history-modal-title">
+                        📜 Korábbi Óraállások Előzményei
+                    </h2>
+                    <span id="historyModalSubtitle" class="history-subtitle-badge"></span>
+                </div>
+                <div style="display: flex; gap: 8px; align-items: center; flex-wrap: nowrap;">
+                    <button onclick="deleteAllHistoryForCurrentStreet()" title="Töröld ennek az utcának az ÖSSZES elmentett előzményét 1 kattintással!" class="btn-delete-all-hist">
+                        🗑️ Összes előzmény törlése
                     </button>
-                    <button onclick="closeHistoryModal()" style="background: #f1f5f9; color: #64748b; border: none; padding: 6px 12px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 14px;">✕ Bezárás</button>
+                    <button onclick="closeHistoryModal()" class="btn-close-hist">
+                        ✕ Bezárás
+                    </button>
                 </div>
             </div>
-            <p id="historyModalSubtitle" style="color: #475569; font-size: 14px; margin-top: -8px; margin-bottom: 12px; font-weight: 600;"></p>
 
-            <!-- Year and Month Search / Filter Bar + Add New History Button in 1 Single Line -->
-            <div style="display: flex; gap: 8px; align-items: center; justify-content: flex-start; margin-bottom: 16px; background: #f8fafc; padding: 10px 12px; border-radius: 10px; border: 1px solid #e2e8f0; flex-wrap: nowrap;">
-                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 4px; white-space: nowrap;">
-                    <span onclick="triggerCalendarPicker()" title="Kattints a naptár ikonra bármelyik év és hónap kiválasztásához!" style="cursor: pointer; font-size: 14px; background: #e0f2fe; color: #0284c7; padding: 4px 8px; border-radius: 6px; border: 1px solid #7dd3fc; user-select: none;">📅 Év:</span>
-                    <select id="historyYearFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff; font-size: 13px;">
-                        <option value="ALL">Minden Év</option>
-                    </select>
-                    <input type="date" id="historyCalendarPicker" onchange="onCalendarDatePicked(this.value)" style="display: none;">
-                </label>
+            <!-- Filter Bar -->
+            <div class="history-filter-bar">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: nowrap;">
+                    <label class="history-filter-label">
+                        <span onclick="triggerCalendarPicker()" title="Kattints a naptár ikonra bármelyik év és hónap kiválasztásához!" class="history-calendar-btn">📅 Év:</span>
+                        <select id="historyYearFilter" class="history-filter-select" onchange="filterHistoryModalByDate()">
+                            <option value="ALL">Minden Év</option>
+                        </select>
+                        <input type="date" id="historyCalendarPicker" onchange="onCalendarDatePicked(this.value)" style="display: none;">
+                    </label>
 
-                <label style="font-size: 13px; font-weight: bold; color: #0077b6; display: flex; align-items: center; gap: 4px; white-space: nowrap; margin-left: 4px;">
-                    🗓 Hónap:
-                    <select id="historyMonthFilter" onchange="filterHistoryModalByDate()" style="padding: 6px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-weight: bold; color: #0f172a; background: #ffffff; font-size: 13px;">
-                        <option value="ALL">Minden Hónap</option>
-                        <option value="01">Január (01)</option>
-                        <option value="02">Február (02)</option>
-                        <option value="03">Március (03)</option>
-                        <option value="04">Április (04)</option>
-                        <option value="05">Május (05)</option>
-                        <option value="06">Június (06)</option>
-                        <option value="07">Július (07)</option>
-                        <option value="08">Augusztus (08)</option>
-                        <option value="09">Szeptember (09)</option>
-                        <option value="10">Október (10)</option>
-                        <option value="11">November (11)</option>
-                        <option value="12">December (12)</option>
-                    </select>
-                </label>
+                    <label class="history-filter-label">
+                        🗓 Hónap:
+                        <select id="historyMonthFilter" class="history-filter-select" onchange="filterHistoryModalByDate()">
+                            <option value="ALL">Minden Hónap</option>
+                            <option value="01">Január (01)</option>
+                            <option value="02">Február (02)</option>
+                            <option value="03">Március (03)</option>
+                            <option value="04">Április (04)</option>
+                            <option value="05">Május (05)</option>
+                            <option value="06">Június (06)</option>
+                            <option value="07">Július (07)</option>
+                            <option value="08">Augusztus (08)</option>
+                            <option value="09">Szeptember (09)</option>
+                            <option value="10">Október (10)</option>
+                            <option value="11">November (11)</option>
+                            <option value="12">December (12)</option>
+                        </select>
+                    </label>
+                </div>
 
-                <button onclick="openAddHistoricalRecordModal()" title="Adj hozzá kézzel egy új korábbi leolvasási előzményt ehhez az utcához!" style="background: #15803d; color: #ffffff; border: none; padding: 6px 12px; border-radius: 8px; font-weight: bold; cursor: pointer; font-size: 13px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; margin-left: 6px;">
+                <button onclick="openAddHistoricalRecordModal()" title="Adj hozzá kézzel egy új korábbi leolvasási előzményt ehhez az utcához!" class="btn-add-hist">
                     ➕ Új Előzmény
                 </button>
             </div>
-            <div style="max-height: 360px; overflow-y: auto; border: 1px solid #e2e8f0; border-radius: 8px;">
+
+            <!-- Table Container -->
+            <div class="history-table-wrapper">
                 <table class="data-table" style="width: 100%; table-layout: auto;">
-                    <thead>
-                        <tr style="background: #f8fafc;">
-                            <th style="padding: 10px;">Leolvasás Dátuma</th>
-                            <th style="padding: 10px;">Leolvasott Óraállás</th>
-                            <th style="padding: 10px;">Rögzítő Neve</th>
-                            <th style="padding: 10px;">Megjegyzés</th>
-                            <th style="padding: 10px; text-align: center;">Művelet</th>
+                    <thead class="history-table-head">
+                        <tr>
+                            <th class="history-th">Leolvasás Dátuma</th>
+                            <th class="history-th">Leolvasott Óraállás</th>
+                            <th class="history-th">Rögzítő Neve</th>
+                            <th class="history-th">Megjegyzés</th>
+                            <th class="history-th" style="text-align: center;">Művelet</th>
                         </tr>
                     </thead>
                     <tbody id="historyModalTableBody">
@@ -770,7 +801,7 @@
                     </tbody>
                 </table>
             </div>
-            <p style="color: #64748b; font-size: 11px; margin-top: 10px; text-align: center; margin-bottom: 0;">💡 Tipp: Duplán kattintva bármelyik sorra átírhatod az adott korábbi leolvasási adatot!</p>
+            <p class="history-tip-text">💡 Tipp: Duplán kattintva bármelyik sorra átírhatod az adott korábbi leolvasási adatot!</p>
         </div>
     </div>
 

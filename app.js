@@ -158,6 +158,7 @@ function switchWebTab(tabName) {
     const secPump = document.getElementById('pumpSection');
     const primaryBtn = document.getElementById('webPrimaryActionButton');
     const rolloverBtn = document.getElementById('webRolloverBtn');
+    const haviOsszesito = document.getElementById('havi-osszesito');
 
     if (tabName === 'cleaning') {
         if (tabElec) tabElec.classList.remove('active');
@@ -167,8 +168,10 @@ function switchWebTab(tabName) {
         if (secClean) secClean.style.display = 'block';
         if (secPump) secPump.style.display = 'none';
         if (rolloverBtn) rolloverBtn.style.display = 'none';
+        if (haviOsszesito) haviOsszesito.style.display = 'none';
         if (primaryBtn) {
             primaryBtn.innerHTML = '➕ Új Takarítás';
+            primaryBtn.title = 'Új átemelő-takarítási esemény rögzítése a vezetői felületről.';
             primaryBtn.onclick = openAddCleaningModal;
             primaryBtn.style.display = 'inline-block';
         }
@@ -181,8 +184,10 @@ function switchWebTab(tabName) {
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'block';
         if (rolloverBtn) rolloverBtn.style.display = 'none';
+        if (haviOsszesito) haviOsszesito.style.display = 'none';
         if (primaryBtn) {
             primaryBtn.innerHTML = '➕ Új Szivattyú Adat';
+            primaryBtn.title = 'Új szivattyú üzemóra vagy állapotadat rögzítése a vezetői felületről.';
             primaryBtn.onclick = openAddPumpModal;
             primaryBtn.style.display = 'inline-block';
         }
@@ -195,8 +200,10 @@ function switchWebTab(tabName) {
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'none';
         if (rolloverBtn) rolloverBtn.style.display = 'inline-flex';
+        if (haviOsszesito) haviOsszesito.style.display = 'inline-flex';
         if (primaryBtn) {
             primaryBtn.innerHTML = '➕ Új Leolvasás';
+            primaryBtn.title = 'Új villanyóra-állás rögzítése manuálisan a vezetői felületről — az adat azonnal frissül a rendszerben és a telefonos alkalmazásban is.';
             primaryBtn.onclick = openAddElectricityModal;
             primaryBtn.style.display = 'inline-block';
         }
@@ -227,36 +234,29 @@ function openEditModal(docId) {
     ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-    const fixedDoc = sameMeterReadings.find(r => r.id === fixedDocId);
-    const latestReading = fixedDoc || (sameMeterReadings.length > 0 ? sameMeterReadings[0] : null);
-    const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
+    const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !r.id.startsWith("hist_")) || sameMeterReadings[0] || null;
 
     let currKwhValue = '';
-    if (latestReading && latestReading.dayKwh > 0) {
-        currKwhValue = Math.round(latestReading.dayKwh);
+    if (primaryReading && primaryReading.dayKwh > 0) {
+        currKwhValue = Math.round(primaryReading.dayKwh);
     }
 
     let prevKwhValue = '';
-    if (latestReading && latestReading.dayKwh > 0) {
-        const baselinePrev = (latestReading.prevDayKwh && latestReading.prevDayKwh > 0) ? latestReading.prevDayKwh : ((previousReading && previousReading.dayKwh > 0) ? previousReading.dayKwh : null);
-        if (baselinePrev !== null && baselinePrev > 0) {
-            prevKwhValue = Math.round(baselinePrev);
-        }
-    } else if (latestReading && latestReading.prevDayKwh && latestReading.prevDayKwh > 0) {
-        prevKwhValue = Math.round(latestReading.prevDayKwh);
+    if (primaryReading && primaryReading.prevDayKwh && primaryReading.prevDayKwh > 0) {
+        prevKwhValue = Math.round(primaryReading.prevDayKwh);
     }
 
-    document.getElementById('editReadingId').value = latestReading ? latestReading.id : fixedDocId;
+    document.getElementById('editReadingId').value = primaryReading ? primaryReading.id : fixedDocId;
     document.getElementById('editOriginalSettlement').value = town;
     document.getElementById('editOriginalMeterName').value = street;
     document.getElementById('editSettlement').value = (town || 'Apaj').replace(/_/g, ' ');
     document.getElementById('editMeterName').value = (street || 'Helyszín').replace(/_/g, ' ');
     document.getElementById('editPrevDayKwh').value = prevKwhValue;
     document.getElementById('editDayKwh').value = currKwhValue;
-    document.getElementById('editDateString').value = (latestReading ? latestReading.dateString : '') || new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
-    document.getElementById('editUserName').value = (latestReading ? latestReading.userName : '') || getLoggedInAdminName();
+    document.getElementById('editDateString').value = (primaryReading ? primaryReading.dateString : '') || new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+    document.getElementById('editUserName').value = (primaryReading ? primaryReading.userName : '') || getLoggedInAdminName();
     const noteElem = document.getElementById('editReadingNote');
-    if (noteElem) noteElem.value = (latestReading ? latestReading.note : '') || '';
+    if (noteElem) noteElem.value = (primaryReading ? primaryReading.note : '') || '';
 
     const modal = document.getElementById('editModal');
     if (modal) modal.style.display = 'flex';
@@ -428,25 +428,6 @@ function saveEditFromWeb() {
             db.collection("electricity_readings").doc(fixedDocId).set(payload, { merge: true })
                 .then(() => console.log("Sikeresen frissítve a Firestore-ban:", fixedDocId))
                 .catch(e => console.error("Hiba a Firestore frissítésnél:", e));
-
-            if (dayKwh > 0) {
-                const timestampId = Date.now();
-                const archiveId = `hist_${settlementName}_${meterName}_${timestampId}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-                const archivePayload = {
-                    id: archiveId,
-                    settlementName: settlementName,
-                    meterName: meterName,
-                    dayKwh: dayKwh,
-                    prevDayKwh: prevDayKwh,
-                    dateString: dateString,
-                    userEmail: getLoggedInAdminEmail(),
-                    userName: userName,
-                    note: noteText,
-                    timestamp: timestampId
-                };
-                electricityReadings.unshift(archivePayload);
-                db.collection("electricity_readings").doc(archiveId).set(archivePayload, { merge: true });
-            }
         } catch (e) {
             console.error("Firebase update error:", e);
         }
@@ -476,6 +457,7 @@ function deleteReadingFromWeb(docId) {
 
 function exportToExcel() {
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
+    const searchQuery = document.getElementById('electricitySearch') ? document.getElementById('electricitySearch').value.trim().toLowerCase() : '';
 
     const townsToInclude = (plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter])
         .sort((a, b) => a.localeCompare(b, 'hu'));
@@ -488,70 +470,88 @@ function exportToExcel() {
             const normTown = normalizeStreetName(town);
             const normStreet = normalizeStreetName(street);
 
+            const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
             const sameMeterReadings = electricityReadings.filter(r =>
                 normalizeStreetName(r.settlementName) === normTown &&
                 normalizeStreetName(r.meterName) === normStreet
             ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
 
-            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
-            const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
+            const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !r.id.startsWith("hist_")) || sameMeterReadings[0] || null;
 
-            let prevKwhVal = '-';
-            let currKwhVal = '-';
+            let prevKwhNum = null;
+            let currKwhNum = null;
 
-            if (latestReading) {
-                const baselinePrev = (latestReading.prevDayKwh && latestReading.prevDayKwh > 0)
-                    ? latestReading.prevDayKwh
-                    : ((previousReading && previousReading.dayKwh > 0) ? previousReading.dayKwh : null);
+            if (primaryReading) {
+                const baselinePrev = (primaryReading.prevDayKwh && primaryReading.prevDayKwh > 0)
+                    ? primaryReading.prevDayKwh
+                    : null;
 
                 if (baselinePrev !== null && baselinePrev > 0) {
-                    prevKwhVal = Math.round(baselinePrev).toString();
+                    prevKwhNum = Math.round(baselinePrev);
                 }
 
-                if (latestReading.dayKwh > 0) {
-                    currKwhVal = Math.round(latestReading.dayKwh).toString();
+                if (primaryReading.dayKwh > 0) {
+                    currKwhNum = Math.round(primaryReading.dayKwh);
                 }
             }
 
             exportRows.push({
                 town: town,
                 street: street,
-                prevKwhVal: prevKwhVal,
-                currKwhVal: currKwhVal
+                prevKwhNum: prevKwhNum,
+                currKwhNum: currKwhNum
             });
         });
     });
+
+    if (searchQuery) {
+        exportRows = exportRows.filter(r =>
+            (r.town || '').toLowerCase().includes(searchQuery) ||
+            (r.street || '').toLowerCase().includes(searchQuery) ||
+            (r.prevKwhNum !== null && r.prevKwhNum.toString().includes(searchQuery)) ||
+            (r.currKwhNum !== null && r.currKwhNum.toString().includes(searchQuery))
+        );
+    }
 
     if (exportRows.length === 0) {
         alert("Nincs letölthető villanyóra leolvasási adat!");
         return;
     }
 
-    let csvContent = "\uFEFF";
-    csvContent += "Település;Utca;Előző óraállás;Óraállás\n";
+    if (typeof XLSX === 'undefined') {
+        alert("Hiba: Az Excel (SheetJS) könyvtár nincs betöltve az oldalon!");
+        return;
+    }
 
-    exportRows.forEach((item) => {
-        const line = [
-            `"${(item.town || '').replace(/"/g, '""')}"`,
-            `"${(item.street || '').replace(/"/g, '""')}"`,
-            `"${item.prevKwhVal}"`,
-            `"${item.currKwhVal}"`
-        ].join(";");
+    const dataForSheet = [
+        ["Település", "Utca", "Előző Óraállás", "Óraállás"]
+    ];
 
-        csvContent += line + "\n";
+    exportRows.forEach(item => {
+        dataForSheet.push([
+            item.town,
+            item.street,
+            item.prevKwhNum !== null ? item.prevKwhNum : "",
+            item.currKwhNum !== null ? item.currKwhNum : ""
+        ]);
     });
 
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement("a");
-    const url = URL.createObjectURL(blob);
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `Bviz_Villanyora_Allasok_${dateStr}.csv`;
+    const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
 
-    link.setAttribute("href", url);
-    link.setAttribute("download", fileName);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    ws['!cols'] = [
+        { wch: 22 },
+        { wch: 32 },
+        { wch: 18 },
+        { wch: 15 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Villanyóra Állások");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    const fileName = `Villanyora_allasok_${dateStr}.xlsx`;
+
+    XLSX.writeFile(wb, fileName);
 }
 
 function resolveDisplayName(rawName, rawEmail) {
@@ -903,7 +903,7 @@ function renderCleaningTable() {
         displayList.forEach(loc => {
             const row = document.createElement('tr');
             row.style.cursor = 'pointer';
-            row.title = 'Kattints a helyszínre az összes előzmény megtekintéséhez!';
+            row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
             row.onclick = (e) => {
                 if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
                     openLocationCleaningHistoryModal(loc.key);
@@ -983,7 +983,7 @@ function renderCleaningTable() {
             const rec = item.record;
             const row = document.createElement('tr');
             row.style.cursor = 'pointer';
-            row.title = 'Kattints a bejegyzésre a szerkesztéshez!';
+            row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
             row.onclick = (e) => {
                 if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
                     openCleaningEditModal(rec.id);
@@ -1638,7 +1638,7 @@ function renderPumpTable() {
 
         const row = document.createElement('tr');
         row.style.cursor = 'pointer';
-        row.title = 'Kattints a sorra a szerkesztéshez!';
+        row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
         row.onclick = () => {
             openPumpVisualView(item.settlementName || '', item.streetName || '');
         };
@@ -1689,6 +1689,7 @@ function initDashboard() {
                 });
                 electricityReadings = list;
                 renderTable();
+                updateMonthlyProgressSummaryWeb();
             }, (error) => {
                 console.warn("Firestore electricity_readings snapshot error:", error);
             });
@@ -1800,6 +1801,56 @@ function normalizeStreetName(str) {
         .replace(/\s+/g, ' ');
 }
 
+function updateMonthlyProgressSummaryWeb() {
+    const leolvasottEl = document.getElementById('leolvasott-count');
+    const osszesEl = document.getElementById('osszes-count');
+    const hatralevoContainer = document.getElementById('hatralevo-container');
+    const progressBar = document.getElementById('haviProgressBar');
+
+    if (!leolvasottEl || !osszesEl || !hatralevoContainer) return;
+
+    let totalMeters = 0;
+    let recordedMeters = 0;
+
+    const towns = Object.keys(streetMapData);
+    towns.forEach(town => {
+        const streets = streetMapData[town] || [];
+        const normTown = normalizeStreetName(town);
+
+        streets.forEach(street => {
+            const normStreet = normalizeStreetName(street);
+            totalMeters++;
+
+            const sameMeterReadings = electricityReadings.filter(r =>
+                normalizeStreetName(r.settlementName) === normTown &&
+                normalizeStreetName(r.meterName) === normStreet
+            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
+
+            if (latestReading && latestReading.dayKwh > 0) {
+                recordedMeters++;
+            }
+        });
+    });
+
+    const remainingMeters = Math.max(0, totalMeters - recordedMeters);
+    const progressPercent = totalMeters > 0 ? Math.min(100, Math.round((recordedMeters / totalMeters) * 100)) : 0;
+
+    leolvasottEl.textContent = recordedMeters;
+    osszesEl.textContent = totalMeters;
+
+    if (remainingMeters === 0 && totalMeters > 0) {
+        hatralevoContainer.innerHTML = '<span style="background: #15803d; color: #ffffff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">Kész!</span>';
+    } else {
+        hatralevoContainer.innerHTML = `Még <span id="hatralevo-count" style="color: #80deea; font-weight: bold;">${remainingMeters}</span> db`;
+    }
+
+    if (progressBar) {
+        progressBar.style.width = `${progressPercent}%`;
+    }
+}
+
 function renderTable() {
     const tbody = document.getElementById('readingsTableBody');
     const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
@@ -1824,8 +1875,7 @@ function renderTable() {
             ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
 
             const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
-            const previousReading = sameMeterReadings.find(r => r.id !== (latestReading ? latestReading.id : ''));
+            const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !r.id.startsWith("hist_")) || sameMeterReadings[0] || null;
 
             let prevKwhText = '-';
             let currKwhText = '-';
@@ -1835,38 +1885,42 @@ function renderTable() {
             let noteText = '-';
             let docId = fixedDocId;
 
-            if (latestReading) {
-                dateStr = latestReading.dateString || '2026. 11. 11.';
-                noteText = latestReading.note || noteText;
-                docId = latestReading.id;
+            if (primaryReading) {
+                dateStr = primaryReading.dateString || '2026. 11. 11.';
+                noteText = primaryReading.note || noteText;
+                docId = primaryReading.id;
 
-                const mostRecentDoc = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
-                if (mostRecentDoc && mostRecentDoc.userName && mostRecentDoc.userName.trim() !== '') {
-                    uploaderName = mostRecentDoc.userName;
-                } else if (latestReading.userName) {
-                    uploaderName = latestReading.userName;
+                if (primaryReading.userName && primaryReading.userName.trim() !== '') {
+                    uploaderName = primaryReading.userName;
                 }
 
-                // Baseline previous reading (Explicit prevDayKwh OR previous month's final reading on/after 5th)
-                const baselinePrev = (latestReading.prevDayKwh && latestReading.prevDayKwh > 0)
-                    ? latestReading.prevDayKwh
-                    : ((previousReading && previousReading.dayKwh > 0) ? previousReading.dayKwh : null);
+                // Baseline previous reading (Explicit prevDayKwh only)
+                const baselinePrev = (primaryReading.prevDayKwh && primaryReading.prevDayKwh > 0)
+                    ? primaryReading.prevDayKwh
+                    : null;
 
                 if (baselinePrev !== null && baselinePrev > 0) {
                     prevKwhText = `${Math.round(baselinePrev)} kWh`;
+                } else {
+                    prevKwhText = '-';
                 }
 
-                if (latestReading.dayKwh > 0) {
-                    currKwhText = `${Math.round(latestReading.dayKwh)} kWh`;
+                if (primaryReading.dayKwh > 0) {
+                    currKwhText = `${Math.round(primaryReading.dayKwh)} kWh`;
 
                     if (baselinePrev !== null && baselinePrev > 0) {
-                        const diff = latestReading.dayKwh - baselinePrev;
+                        const diff = primaryReading.dayKwh - baselinePrev;
                         if (diff >= 0) {
                             diffBadge = `<span style="background: #dcfce7; color: #15803d; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block;">▲ +${Math.round(diff)} kWh</span>`;
                         } else {
                             diffBadge = `<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block;">▼ ${Math.round(diff)} kWh</span>`;
                         }
+                    } else {
+                        diffBadge = '<span style="color:#94a3b8;">-</span>';
                     }
+                } else {
+                    currKwhText = '-';
+                    diffBadge = '<span style="color:#94a3b8;">-</span>';
                 }
             }
 
@@ -1923,7 +1977,7 @@ function renderTable() {
     displayList.forEach((item) => {
         const row = document.createElement('tr');
         row.style.cursor = 'grab';
-        row.title = 'Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
+        row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
         row.draggable = true;
 
         row.ondragstart = (e) => {
@@ -1980,6 +2034,8 @@ function renderTable() {
         `;
         tbody.appendChild(row);
     });
+
+    updateMonthlyProgressSummaryWeb();
 }
 
 function reorderStreetInTown(town, draggedStreet, targetStreet) {
@@ -2614,16 +2670,10 @@ function filterHistoryModalByDate() {
     ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
     const historyList = [];
-    const seenKeys = new Set();
 
     rawList.forEach(item => {
-        // Display the rolled-over number that moved to Előző Óraállás
         const displayKwhVal = (item.dayKwh && item.dayKwh > 0) ? item.dayKwh : item.prevDayKwh;
-        const key = `${item.dateString}_${Math.round(displayKwhVal)}`;
-        if (!seenKeys.has(key)) {
-            seenKeys.add(key);
-            historyList.push({ ...item, displayKwh: displayKwhVal });
-        }
+        historyList.push({ ...item, displayKwh: displayKwhVal });
     });
 
     // Apply Year and Month filtering based on submission date
@@ -2656,19 +2706,20 @@ function filterHistoryModalByDate() {
         filteredList.forEach(item => {
             const tr = document.createElement('tr');
             tr.style.cursor = 'pointer';
-            tr.title = 'Duplán kattintva szerkesztheted ezt a korábbi leolvasást!';
+            tr.style.borderBottom = '1px solid #1e293b';
+            tr.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
             tr.ondblclick = () => {
                 openEditHistoryRecordModal(item.id, item.dateString, item.displayKwh, item.userName, item.note, town, street);
             };
             const escapedTown = (town || '').replace(/'/g, "\\'");
             const escapedStreet = (street || '').replace(/'/g, "\\'");
             tr.innerHTML = `
-                <td style="padding: 10px; font-weight: bold;">${item.dateString || '2026. 11. 11.'}</td>
-                <td style="padding: 10px; font-weight: bold; color: #1565c0;">${item.displayKwh > 0 ? Math.round(item.displayKwh) + ' kWh' : '-'}</td>
-                <td style="padding: 10px; font-weight: bold; color: #0077b6;">👤 ${item.userName || 'Rendszer'}</td>
-                <td style="padding: 10px; color: #475569;">${item.note || '-'}</td>
-                <td style="padding: 10px; text-align: center;">
-                    <button onclick="event.stopPropagation(); deleteSingleHistoryRecord('${item.id}', '${escapedTown}', '${escapedStreet}')" class="btn-delete-hist" title="Törlés" style="background: #fee2e2; color: #b91c1c; border: 1px solid #fca5a5; border-radius: 6px; padding: 4px 8px; font-size: 13px; cursor: pointer; font-weight: bold;">🗑 Törlés</button>
+                <td style="padding: 12px; font-weight: bold; color: #f8fafc;">${item.dateString || '2026. 11. 11.'}</td>
+                <td style="padding: 12px; font-weight: bold; color: #38bdf8;">${item.displayKwh > 0 ? Math.round(item.displayKwh) + ' kWh' : '-'}</td>
+                <td style="padding: 12px; font-weight: 600; color: #e2e8f0;">${item.userName || 'Rendszer'}</td>
+                <td style="padding: 12px; color: #94a3b8;">${item.note || '-'}</td>
+                <td style="padding: 12px; text-align: center;">
+                    <button onclick="event.stopPropagation(); deleteSingleHistoryRecord('${item.id}', '${escapedTown}', '${escapedStreet}')" class="btn-delete-hist" title="Törlés" style="background: rgba(239, 68, 68, 0.15); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4); border-radius: 6px; padding: 4px 10px; font-size: 12px; cursor: pointer; font-weight: bold;">🗑 Törlés</button>
                 </td>
             `;
 
@@ -2678,44 +2729,20 @@ function filterHistoryModalByDate() {
 }
 
 function deleteSingleHistoryRecord(recordId, town, street) {
-    const normTown = normalizeStreetName(town);
-    const normStreet = normalizeStreetName(street);
-    const targetItem = electricityReadings.find(r => r.id === recordId);
-
-    let idsToDelete = [recordId];
-
-    if (targetItem) {
-        const targetKwh = Math.round(Number(targetItem.dayKwh || targetItem.prevDayKwh || 0));
-        const targetDate = targetItem.dateString;
-
-        // Find all matching duplicate documents for this street, kwh and date
-        const matches = electricityReadings.filter(r =>
-            r.id === recordId ||
-            (normalizeStreetName(r.settlementName) === normTown &&
-             normalizeStreetName(r.meterName) === normStreet &&
-             (Math.round(r.dayKwh) === targetKwh || Math.round(r.prevDayKwh) === targetKwh) &&
-             r.dateString === targetDate)
-        );
-
-        idsToDelete = [...new Set([recordId, ...matches.map(r => r.id)])];
-    }
-
-    // 1. Immediately remove ALL matching duplicate IDs from local memory (0ms delay!)
-    electricityReadings = electricityReadings.filter(r => !idsToDelete.includes(r.id));
+    // 1. Immediately remove ONLY the selected record by recordId from local memory (0ms delay!)
+    electricityReadings = electricityReadings.filter(r => r.id !== recordId);
 
     // 2. Instantly update open history modal and main table
     openHistoryModal(town, street);
     renderTable();
 
-    // 3. Delete ALL matching document IDs from Cloud Firestore in background
+    // 3. Delete ONLY the selected document ID from Cloud Firestore in background
     if (typeof firebase !== 'undefined') {
         try {
             const db = firebase.firestore();
-            idsToDelete.forEach(id => {
-                db.collection("electricity_readings").doc(id).delete()
-                    .then(() => console.log("Sikeresen 1-kattintással törölve a Firestore-ból:", id))
-                    .catch(e => console.error("Hiba a törlésnél:", e));
-            });
+            db.collection("electricity_readings").doc(recordId).delete()
+                .then(() => console.log("Sikeresen törölve a Firestore-ból:", recordId))
+                .catch(e => console.error("Hiba a törlésnél:", e));
         } catch (e) {
             console.error("Firebase error:", e);
         }
@@ -2943,6 +2970,10 @@ function generateRandomReadingsForAllStreets() {
 }
 
 function simulate5thRollover() {
+    if (!confirm("Biztosan végrehajtod a havi zárást? Az aktuális óraállások átkerülnek az Előző Óraállás oszlopba és az előzményekbe, majd megkezdődik az új leolvasási ciklus.")) {
+        return;
+    }
+
     const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
     let rolledCount = 0;
 
@@ -2952,19 +2983,21 @@ function simulate5thRollover() {
             const normTown = normalizeStreetName(town);
             const normStreet = normalizeStreetName(street);
 
+            const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
             const sameMeterReadings = electricityReadings.filter(r =>
                 normalizeStreetName(r.settlementName) === normTown &&
                 normalizeStreetName(r.meterName) === normStreet
             ).sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-            const activeReading = sameMeterReadings.find(r => r.dayKwh && r.dayKwh > 0);
+            const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !r.id.startsWith("hist_")) || sameMeterReadings.find(r => r.dayKwh && r.dayKwh > 0) || null;
+            const dayVal = primaryReading ? primaryReading.dayKwh : null;
 
-            if (activeReading && activeReading.dayKwh > 0) {
+            // Strict check: ONLY process meters that have a valid positive current reading (dayKwh > 0)
+            if (primaryReading && dayVal !== null && dayVal !== undefined && !isNaN(Number(dayVal)) && Number(dayVal) > 0) {
                 rolledCount++;
-                const currentReadingVal = activeReading.dayKwh;
-                const currentPrevVal = activeReading.prevDayKwh || null;
+                const currentReadingVal = Number(dayVal);
+                const currentPrevVal = (primaryReading.prevDayKwh && primaryReading.prevDayKwh > 0) ? primaryReading.prevDayKwh : null;
                 const timestampNow = Date.now();
-                const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
                 const archiveId = `hist_${town}_${street}_${timestampNow}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
 
                 const archivePayload = {
@@ -2973,10 +3006,10 @@ function simulate5thRollover() {
                     meterName: street,
                     dayKwh: currentReadingVal,
                     prevDayKwh: currentPrevVal,
-                    dateString: activeReading.dateString || dateStr,
-                    userName: activeReading.userName || getLoggedInAdminName(),
-                    userEmail: activeReading.userEmail || getLoggedInAdminEmail(),
-                    note: activeReading.note || '',
+                    dateString: primaryReading.dateString || dateStr,
+                    userName: primaryReading.userName || getLoggedInAdminName(),
+                    userEmail: primaryReading.userEmail || getLoggedInAdminEmail(),
+                    note: primaryReading.note || '',
                     timestamp: timestampNow
                 };
 
@@ -3019,7 +3052,7 @@ function simulate5thRollover() {
     });
 
     renderTable();
-    alert(`🚀 Sikeresen lefutott a 5-i átgördülés ${rolledCount} átemelőnél! Az értékek átkerültek az 'Előző Óraállás' alá, bekerültek az Előzményekbe, és az új havi mezők kiürültek!`);
+    alert(`Sikeresen lefutott a havi zárás ${rolledCount} átemelőnél! Az értékek átkerültek az 'Előző Óraállás' oszlopba, bekerültek az Előzményekbe, és megkezdődött az új leolvasási ciklus!`);
 }
 
 function openEditHistoryRecordModal(recordId, dateStr, kwh, userName, note, town, street) {
