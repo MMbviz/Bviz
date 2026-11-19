@@ -314,7 +314,7 @@
     <div id="loginScreen" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 100%; max-width: 440px; text-align: center; border-top: 6px solid #1b5e20;">
             <img src="bviz_logo.jpg" alt="Bviz Logo" style="height: 130px; border-radius: 22px; margin-bottom: 14px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));">
-            <p style="color: #1b5e20; font-size: 18px; font-weight: bold; margin-bottom: 18px;">Bviz Közműnyilvántartó Rendszer</p>
+            <p style="color: #1b5e20; font-size: 18px; font-weight: bold; margin-bottom: 18px;">Bviz Üzemeltetési Portál</p>
 
             <!-- Tab Switcher: Bejelentkezés vs App letöltése -->
             <div class="login-card-tabs">
@@ -325,12 +325,15 @@
             <!-- Panel 1: Login Form -->
             <form id="loginForm" onsubmit="handleWebLogin(event); return false;">
                 <div style="margin-bottom: 16px; text-align: left;">
-                    <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
+                    <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;" class="form-label">Felhasználónév</label>
                     <input type="text" id="webUsername" placeholder="Felhasználónév" required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
                 </div>
                 <div style="margin-bottom: 20px; text-align: left;">
-                    <label for="webPassword" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Jelszó</label>
-                    <input type="password" id="webPassword" placeholder="Jelszó" required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                    <label for="webPassword" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;" class="form-label">Jelszó</label>
+                    <div style="position: relative; width: 100%;">
+                        <input type="password" id="webPassword" placeholder="Jelszó" required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px 60px 12px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                        <span id="togglePasswordBtn" onclick="togglePasswordVisibility('webPassword', 'togglePasswordBtn')" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: bold; color: #94a3b8; cursor: pointer; user-select: none;" title="Jelszó megjelenítése / elrejtése">Mutat</span>
+                    </div>
                 </div>
                 <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás felhasználónév vagy jelszó!</div>
                 <button type="button" onclick="handleWebLogin(event)" style="width: 100%; background: linear-gradient(135deg, #1b5e20, #2e7d32); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(27,94,32,0.3);">Bejelentkezés</button>
@@ -342,8 +345,11 @@
                     A legújabb <strong>Bviz Android (.apk)</strong> telepítőfájl letöltéséhez add meg a hozzáférési kódot.
                 </p>
                 <div style="margin-bottom: 18px; text-align: left;">
-                    <label for="appDownloadCode" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Letöltési kód</label>
-                    <input type="password" id="appDownloadCode" placeholder="Add meg a letöltési kódot..." required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                    <label for="appDownloadCode" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;" class="form-label">Letöltési kód</label>
+                    <div style="position: relative; width: 100%;">
+                        <input type="password" id="appDownloadCode" placeholder="Add meg a letöltési kódot..." required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px 60px 12px 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                        <span id="toggleDownloadCodeBtn" onclick="togglePasswordVisibility('appDownloadCode', 'toggleDownloadCodeBtn')" style="position: absolute; right: 14px; top: 50%; transform: translateY(-50%); font-size: 12px; font-weight: bold; color: #94a3b8; cursor: pointer; user-select: none;" title="Kód megjelenítése / elrejtése">Mutat</span>
+                    </div>
                 </div>
                 <div id="downloadStatusMsg" style="font-size: 13px; font-weight: bold; margin-bottom: 16px; display: none;"></div>
                 <button type="submit" id="downloadSubmitBtn" style="width: 100%; background: linear-gradient(135deg, #0077b6, #0284c7); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,119,182,0.3);">
@@ -681,7 +687,7 @@
         <!-- Clean Gray Footer -->
         <footer style="text-align: center; margin: 32px 0 24px 0; color: #64748b; font-size: 13px;">
             <p style="margin-bottom: 4px; font-weight: bold; letter-spacing: 1px;">◆ VÍZ- ÉS CSATORNASZOLGÁLTATÓ ZRT.</p>
-            <p style="margin: 0;">Bviz Közműnyilvántartó Rendszer © 2026</p>
+            <p style="margin: 0;">Bviz Üzemeltetési Portál © 2026</p>
         </footer>
     </div>
 

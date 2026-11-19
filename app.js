@@ -140,6 +140,23 @@ function handleWebLogin(event) {
         });
 }
 
+function togglePasswordVisibility(inputId, btnId) {
+    const targetId = inputId || 'webPassword';
+    const buttonId = btnId || 'togglePasswordBtn';
+    const passInput = document.getElementById(targetId);
+    const toggleBtn = document.getElementById(buttonId);
+
+    if (passInput && toggleBtn) {
+        if (passInput.type === 'password') {
+            passInput.type = 'text';
+            toggleBtn.textContent = 'Elrejt';
+        } else {
+            passInput.type = 'password';
+            toggleBtn.textContent = 'Mutat';
+        }
+    }
+}
+
 function handleWebLogout() {
     if (typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().signOut().then(() => {
