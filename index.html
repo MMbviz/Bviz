@@ -39,6 +39,45 @@
             color: #ffffff;
             box-shadow: 0 4px 12px rgba(27,94,32,0.35);
         }
+
+        /* Login & App Download Card Tabs */
+        .login-card-tabs {
+            display: flex;
+            background: #f1f5f9;
+            padding: 4px;
+            border-radius: 10px;
+            margin-bottom: 22px;
+            border: 1px solid #cbd5e1;
+        }
+        .login-card-tab-btn {
+            flex: 1;
+            border: none;
+            padding: 10px 12px;
+            border-radius: 7px;
+            font-size: 14px;
+            font-weight: bold;
+            cursor: pointer;
+            background: transparent;
+            color: #475569;
+            transition: all 0.2s ease;
+        }
+        .login-card-tab-btn.active {
+            background: linear-gradient(135deg, #1b5e20, #2e7d32);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(27,94,32,0.25);
+        }
+        body.dark-theme .login-card-tabs {
+            background: #040810 !important;
+            border-color: #1a2333 !important;
+        }
+        body.dark-theme .login-card-tab-btn {
+            color: #94a3b8 !important;
+        }
+        body.dark-theme .login-card-tab-btn.active {
+            background: linear-gradient(135deg, #0077b6, #0284c7) !important;
+            color: #ffffff !important;
+        }
+
         .table-card {
             background: #ffffff;
             border-radius: 16px;
@@ -48,7 +87,7 @@
             margin-bottom: 24px;
         }
 
-        /* Eye-Care Deep Dark Theme Styles (Photo 2 Midnight Color) */
+        /* Eye-Care Deep Dark Theme Styles */
         body.dark-theme {
             background-color: #060b14 !important;
             color: #ffffff !important;
@@ -271,11 +310,19 @@
         <option value="Grundfos"></option>
     </datalist>
 
-    <!-- Master Web Login Screen -->
+    <!-- Master Web Login & App Download Screen -->
     <div id="loginScreen" style="display: flex; justify-content: center; align-items: center; min-height: 85vh;">
         <div style="background: #ffffff; padding: 36px 32px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.15); width: 100%; max-width: 440px; text-align: center; border-top: 6px solid #1b5e20;">
             <img src="bviz_logo.jpg" alt="Bviz Logo" style="height: 130px; border-radius: 22px; margin-bottom: 14px; filter: drop-shadow(0 6px 12px rgba(0,0,0,0.2));">
-            <p style="color: #1b5e20; font-size: 18px; font-weight: bold; margin-bottom: 24px;">Vezetői irányítópult</p>
+            <p style="color: #1b5e20; font-size: 18px; font-weight: bold; margin-bottom: 18px;">Bviz Közműnyilvántartó Rendszer</p>
+
+            <!-- Tab Switcher: Bejelentkezés vs App letöltése -->
+            <div class="login-card-tabs">
+                <button type="button" id="tabBtnLogin" class="login-card-tab-btn active" onclick="switchAuthCardTab('login')">🔐 Bejelentkezés</button>
+                <button type="button" id="tabBtnDownload" class="login-card-tab-btn" onclick="switchAuthCardTab('download')">📱 App letöltése</button>
+            </div>
+
+            <!-- Panel 1: Login Form -->
             <form id="loginForm" onsubmit="handleWebLogin(event); return false;">
                 <div style="margin-bottom: 16px; text-align: left;">
                     <label for="webUsername" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Felhasználónév</label>
@@ -287,6 +334,21 @@
                 </div>
                 <div id="loginError" style="color: #d32f2f; font-size: 13px; margin-bottom: 16px; display: none;">Hibás felhasználónév vagy jelszó!</div>
                 <button type="button" onclick="handleWebLogin(event)" style="width: 100%; background: linear-gradient(135deg, #1b5e20, #2e7d32); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(27,94,32,0.3);">Bejelentkezés</button>
+            </form>
+
+            <!-- Panel 2: Protected App Download Form -->
+            <form id="appDownloadForm" style="display: none;" onsubmit="verifyAndDownloadApp(event); return false;">
+                <p style="color: #475569; font-size: 13px; margin-top: 0; margin-bottom: 16px; line-height: 1.5;">
+                    A legújabb <strong>Bviz Android (.apk)</strong> telepítőfájl letöltéséhez add meg a hozzáférési kódot.
+                </p>
+                <div style="margin-bottom: 18px; text-align: left;">
+                    <label for="appDownloadCode" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px; color: #333;">Letöltési kód</label>
+                    <input type="password" id="appDownloadCode" placeholder="Add meg a letöltési kódot..." required autocapitalize="none" spellcheck="false" style="width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 14px; box-sizing: border-box;">
+                </div>
+                <div id="downloadStatusMsg" style="font-size: 13px; font-weight: bold; margin-bottom: 16px; display: none;"></div>
+                <button type="submit" id="downloadSubmitBtn" style="width: 100%; background: linear-gradient(135deg, #0077b6, #0284c7); color: white; border: none; padding: 14px; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 10px rgba(0,119,182,0.3);">
+                    ⬇️ Alkalmazás letöltése (.apk)
+                </button>
             </form>
         </div>
     </div>
@@ -1067,5 +1129,75 @@
     </div>
 
     <script src="app.js"></script>
+
+    <!-- Tab Switching & Firebase Server-Side Code Verification -->
+    <script>
+        function switchAuthCardTab(tabName) {
+            const loginForm = document.getElementById('loginForm');
+            const downloadForm = document.getElementById('appDownloadForm');
+            const tabLogin = document.getElementById('tabBtnLogin');
+            const tabDownload = document.getElementById('tabBtnDownload');
+            const statusMsg = document.getElementById('downloadStatusMsg');
+
+            if (tabName === 'login') {
+                loginForm.style.display = 'block';
+                downloadForm.style.display = 'none';
+                tabLogin.classList.add('active');
+                tabDownload.classList.remove('active');
+            } else {
+                loginForm.style.display = 'none';
+                downloadForm.style.display = 'block';
+                tabDownload.classList.add('active');
+                tabLogin.classList.remove('active');
+                statusMsg.style.display = 'none';
+                document.getElementById('appDownloadCode').focus();
+            }
+        }
+
+        async function verifyAndDownloadApp(event) {
+            if (event) event.preventDefault();
+            const codeInput = document.getElementById('appDownloadCode');
+            const statusMsg = document.getElementById('downloadStatusMsg');
+            const submitBtn = document.getElementById('downloadSubmitBtn');
+            const enteredCode = (codeInput.value || '').trim();
+
+            if (!enteredCode) {
+                statusMsg.style.color = '#d32f2f';
+                statusMsg.textContent = 'Kérjük, add meg a letöltési kódot!';
+                statusMsg.style.display = 'block';
+                return;
+            }
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Ellenőrzés...';
+            statusMsg.style.display = 'none';
+
+            try {
+                // Közvetlenül a beírt kód nevű dokumentumot kérdezi le a Firestore-ból
+                const docRef = firebase.firestore().collection('app_downloads').doc(enteredCode);
+                const docSnap = await docRef.get();
+
+                if (docSnap.exists && docSnap.data().apkUrl) {
+                    statusMsg.style.color = '#15803d';
+                    statusMsg.textContent = '✔ Helyes kód! A Bviz.apk letöltése elindult...';
+                    statusMsg.style.display = 'block';
+                    codeInput.value = '';
+                    window.location.href = docSnap.data().apkUrl;
+                } else {
+                    statusMsg.style.color = '#d32f2f';
+                    statusMsg.textContent = '❌ Hibás letöltési kód!';
+                    statusMsg.style.display = 'block';
+                }
+            } catch (err) {
+                // Ha a Firestore szabály elutasítja vagy nincs ilyen dokumentum
+                statusMsg.style.color = '#d32f2f';
+                statusMsg.textContent = '❌ Hibás letöltési kód!';
+                statusMsg.style.display = 'block';
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = '⬇️ Alkalmazás letöltése (.apk)';
+            }
+        }
+    </script>
 </body>
 </html>
