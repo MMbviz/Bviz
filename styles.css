@@ -11,6 +11,27 @@ body {
     padding: 16px 24px;
 }
 
+/* Light Mode Focused Inputs Styling */
+body:not(.dark-theme) input:focus,
+body:not(.dark-theme) select:focus,
+body:not(.dark-theme) textarea:focus {
+    background-color: #FFF9E6 !important;
+    border: 2px solid #0284C7 !important;
+    box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.2) !important;
+    outline: none !important;
+}
+
+/* Dark Mode Focused Inputs Styling */
+body.dark-theme input:focus,
+body.dark-theme select:focus,
+body.dark-theme textarea:focus {
+    background-color: #1E2E42 !important;
+    border: 2px solid #38BDF8 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
+    color: #ffffff !important;
+    outline: none !important;
+}
+
 .dashboard-container {
     max-width: 98%;
     width: 98%;
@@ -942,4 +963,147 @@ body.dark-theme .btn-delete-hist:hover {
 
 body.dark-theme .history-tip-text {
     color: #94a3b8 !important;
+}
+
+/* Pump Inspection & Warehouse Visual Cards Styling */
+.visual-modal-card {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+}
+
+.pump-card-box,
+.warehouse-card-box,
+.pump-note-box {
+    background: #ffffff;
+    border: 1px solid #cbd5e1;
+}
+
+.pump-card-title {
+    color: #1e293b;
+}
+
+.pump-field-label {
+    display: block;
+    font-size: 11px;
+    font-weight: bold;
+    color: #1e293b;
+    margin-bottom: 4px;
+}
+
+body.dark-theme .pump-field-label {
+    color: #38bdf8 !important;
+}
+
+/* Status Chip Button for Pump Warehouse */
+.wh-status-chip {
+    padding: 8px 20px;
+    border-radius: 999px;
+    font-weight: bold;
+    font-size: 13px;
+    cursor: pointer;
+    display: inline-block;
+    margin-bottom: 14px;
+    user-select: none;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+    transition: all 0.2s ease;
+}
+
+.wh-status-chip.chip-van {
+    background-color: #16a34a !important;
+    color: #ffffff !important;
+}
+
+.wh-status-chip.chip-nincs {
+    background-color: #dc2626 !important;
+    color: #ffffff !important;
+}
+
+/* Dark Theme Overrides for Visual Modal Cards */
+body.dark-theme #pumpVisualContainer,
+body.dark-theme #pumpWarehouseVisualContainer {
+    background: transparent !important;
+}
+
+body.dark-theme .visual-modal-card {
+    background: #0B111A !important;
+    border-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .pump-card-box,
+body.dark-theme .warehouse-card-box,
+body.dark-theme .pump-note-box {
+    background: #161E29 !important;
+    border: 1px solid #283548 !important;
+    border-radius: 14px !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .pump-card-title {
+    color: #F1F5F9 !important;
+}
+
+body.dark-theme #pumpVisualContainer input,
+body.dark-theme #pumpVisualContainer select,
+body.dark-theme #pumpVisualContainer textarea,
+body.dark-theme #pumpWarehouseVisualContainer input,
+body.dark-theme #pumpWarehouseVisualContainer select,
+body.dark-theme #pumpWarehouseVisualContainer textarea {
+    background-color: #0E141C !important;
+    color: #ffffff !important;
+    border: 1px solid #283548 !important;
+}
+
+body.dark-theme #pumpVisualContainer input:focus,
+body.dark-theme #pumpVisualContainer select:focus,
+body.dark-theme #pumpVisualContainer textarea:focus,
+body.dark-theme #pumpWarehouseVisualContainer input:focus,
+body.dark-theme #pumpWarehouseVisualContainer select:focus,
+body.dark-theme #pumpWarehouseVisualContainer textarea:focus {
+    background-color: #1E2E42 !important;
+    border: 2px solid #38BDF8 !important;
+    box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.25) !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme #pumpVisualContainer select option,
+body.dark-theme #pumpWarehouseVisualContainer select option {
+    background-color: #161E29 !important;
+    color: #ffffff !important;
+}
+
+/* About Modal Dark Theme Overrides */
+body.dark-theme .about-modal-content {
+    background: #080d19 !important;
+    border-color: #1e293b !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .about-modal-title {
+    color: #ffffff !important;
+}
+
+body.dark-theme .about-modal-subtitle {
+    color: #94a3b8 !important;
+}
+
+body.dark-theme .about-info-card {
+    background: #0f172a !important;
+    border-color: #1e293b !important;
+}
+
+body.dark-theme .about-info-row {
+    border-bottom-color: #1e293b !important;
+}
+
+body.dark-theme .about-info-label {
+    color: #94a3b8 !important;
+}
+
+body.dark-theme .about-info-val {
+    color: #f8fafc !important;
+}
+
+body.dark-theme .about-info-link {
+    color: #38bdf8 !important;
 }

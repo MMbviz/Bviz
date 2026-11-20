@@ -73,7 +73,7 @@ function checkWebSession() {
 
     if (typeof firebase !== 'undefined' && firebase.auth) {
         firebase.auth().onAuthStateChanged((user) => {
-            if (user && user.email && user.email.endsWith('@bviz.admin')) {
+            if (user && user.email) {
                 const userDisplayEl = document.getElementById('userDisplay');
                 if (userDisplayEl) {
                     userDisplayEl.innerHTML = `Hitelesített Vezetői Hozzáférés: <strong style="color: #80deea; font-size: 15px;">${getLoggedInAdminName()}</strong>`;
@@ -82,7 +82,6 @@ function checkWebSession() {
                 if (dashboardContainer) dashboardContainer.style.display = 'block';
                 initDashboard();
             } else {
-                if (user) firebase.auth().signOut();
                 if (loginScreen) loginScreen.style.display = 'flex';
                 if (dashboardContainer) dashboardContainer.style.display = 'none';
             }
@@ -91,6 +90,15 @@ function checkWebSession() {
         if (loginScreen) loginScreen.style.display = 'flex';
         if (dashboardContainer) dashboardContainer.style.display = 'none';
     }
+}
+
+function normalizeNameToEmailPrefixWeb(name) {
+    if (name.includes('@')) return name.toLowerCase().trim();
+    const unaccented = name.toLowerCase()
+        .replace(/á/g, "a").replace(/é/g, "e").replace(/í/g, "i")
+        .replace(/ó/g, "o").replace(/ö/g, "o").replace(/ő/g, "o")
+        .replace(/ú/g, "u").replace(/ü/g, "u").replace(/ű/g, "u");
+    return unaccented.replace(/[^a-z0-9]/g, "");
 }
 
 function handleWebLogin(event) {
@@ -109,16 +117,6 @@ function handleWebLogin(event) {
         return;
     }
 
-    const adminEmail = formatAdminEmail(rawUser);
-
-    if (!adminEmail.endsWith('@bviz.admin')) {
-        if (loginError) {
-            loginError.innerText = 'Nincs vezetői jogosultságod a webes felülethez!';
-            loginError.style.display = 'block';
-        }
-        return;
-    }
-
     if (typeof firebase === 'undefined' || !firebase.auth) {
         if (loginError) {
             loginError.innerText = 'Hiba: A Firebase hitelesítés nincs betöltve az oldalon!';
@@ -127,17 +125,132 @@ function handleWebLogin(event) {
         return;
     }
 
-    firebase.auth().signInWithEmailAndPassword(adminEmail, passInput)
-        .then(() => {
-            if (loginError) loginError.style.display = 'none';
-        })
-        .catch((error) => {
-            console.error("Belépési hiba:", error.code);
-            if (loginError) {
-                loginError.innerText = 'Hibás felhasználónév vagy jelszó (vagy nincs vezetői jogosultság)!';
-                loginError.style.display = 'block';
-            }
+    const auth = firebase.auth();
+    const prefix = normalizeNameToEmailPrefixWeb(rawUser);
+
+    const emailCandidate1 = rawUser.includes('@') ? rawUser : `${prefix}@bviz.admin`;
+    const emailCandidate2 = rawUser.includes('@') ? rawUser : `${rawUser.toLowerCase().replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '.')}@bviz.admin`;
+    const emailCandidate3 = rawUser.includes('@') ? rawUser : `${prefix}@bviz.local`;
+
+    auth.signInWithEmailAndPassword(emailCandidate1, passInput)
+        .then(() => { if (loginError) loginError.style.display = 'none'; })
+        .catch(() => {
+            auth.signInWithEmailAndPassword(emailCandidate2, passInput)
+                .then(() => { if (loginError) loginError.style.display = 'none'; })
+                .catch(() => {
+                    auth.signInWithEmailAndPassword(emailCandidate3, passInput)
+                        .then(() => { if (loginError) loginError.style.display = 'none'; })
+                        .catch((error) => {
+                            console.error("Belépési hiba:", error.code, error.message);
+                            if (loginError) {
+                                loginError.innerText = 'Hibás felhasználónév vagy jelszó!';
+                                loginError.style.display = 'block';
+                            }
+                        });
+                });
         });
+}
+
+const WEB_VERSION = "1.5";
+let cachedWebVersion = WEB_VERSION;
+
+function compareVersions(v1, v2) {
+    const p1 = (v1 || '').toString().split('.').map(n => parseInt(n, 10) || 0);
+    const p2 = (v2 || '').toString().split('.').map(n => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(p1.length, p2.length); i++) {
+        const n1 = p1[i] || 0;
+        const n2 = p2[i] || 0;
+        if (n1 > n2) return 1;
+        if (n1 < n2) return -1;
+    }
+    return 0;
+}
+
+function fetchGitHubCommitVersion() {
+    try {
+        fetch('https://api.github.com/repos/mmbviz/Bviz/commits?per_page=1')
+            .then(response => {
+                const linkHeader = response.headers.get('Link');
+                if (linkHeader) {
+                    const match = linkHeader.match(/page=(\d+)>; rel="last"/);
+                    if (match && match[1]) {
+                        const totalCommits = parseInt(match[1], 10) || 0;
+                        const minorVersion = Math.max(0, totalCommits - 41);
+                        const ghVersion = `1.${minorVersion}`;
+                        if (compareVersions(ghVersion, cachedWebVersion) >= 0) {
+                            cachedWebVersion = ghVersion;
+                            updateWebAboutVersionUI();
+                        }
+                    }
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (Array.isArray(data) && data.length > 0 && data[0].commit && data[0].commit.author) {
+                    console.log("Legutóbbi GitHub commit dátuma:", data[0].commit.author.date);
+                }
+            })
+            .catch(err => console.warn("GitHub commit fetch info:", err));
+    } catch (e) {
+        console.warn("GitHub version fetch exception:", e);
+    }
+}
+
+function fetchWebVersionFromFirestore() {
+    fetchGitHubCommitVersion();
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            db.collection("app_config").doc("system").onSnapshot(doc => {
+                if (doc.exists) {
+                    const data = doc.data();
+                    const fsVer = (data.appVersion || data.version || '').toString().trim();
+                    if (fsVer && compareVersions(fsVer, cachedWebVersion) > 0) {
+                        cachedWebVersion = fsVer;
+                        updateWebAboutVersionUI();
+                    }
+                }
+            }, err => console.warn("Firestore system version listener warning:", err));
+
+            db.collection("app_downloads").get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const data = doc.data();
+                    const fsVer = (data.version || data.appVersion || '').toString().trim();
+                    if (fsVer && compareVersions(fsVer, cachedWebVersion) > 0) {
+                        cachedWebVersion = fsVer;
+                        updateWebAboutVersionUI();
+                    }
+                });
+            }).catch(err => console.warn("App downloads version fetch error:", err));
+        } catch (e) {
+            console.warn("Firestore version fetch error:", e);
+        }
+    }
+}
+
+function updateWebAboutVersionUI() {
+    const verEl = document.getElementById('aboutVersionDisplay');
+    if (verEl) {
+        verEl.textContent = cachedWebVersion;
+    }
+}
+
+function openAboutModal() {
+    fetchWebVersionFromFirestore();
+    updateWebAboutVersionUI();
+    const modal = document.getElementById('aboutModal');
+    if (modal) modal.style.display = 'flex';
+}
+
+function closeAboutModal() {
+    const modal = document.getElementById('aboutModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function closeAboutModalOnBackdrop(e) {
+    if (e.target && e.target.id === 'aboutModal') {
+        closeAboutModal();
+    }
 }
 
 function togglePasswordVisibility(inputId, btnId) {
@@ -170,9 +283,11 @@ function switchWebTab(tabName) {
     const tabElec = document.getElementById('webTabElectricity');
     const tabClean = document.getElementById('webTabCleaning');
     const tabPump = document.getElementById('webTabPump');
+    const tabWarehouse = document.getElementById('webTabPumpWarehouse');
     const secElec = document.getElementById('electricitySection');
     const secClean = document.getElementById('cleaningSection');
     const secPump = document.getElementById('pumpSection');
+    const secWarehouse = document.getElementById('pumpWarehouseSection');
     const primaryBtn = document.getElementById('webPrimaryActionButton');
     const rolloverBtn = document.getElementById('webRolloverBtn');
     const haviOsszesito = document.getElementById('havi-osszesito');
@@ -181,9 +296,11 @@ function switchWebTab(tabName) {
         if (tabElec) tabElec.classList.remove('active');
         if (tabClean) tabClean.classList.add('active');
         if (tabPump) tabPump.classList.remove('active');
+        if (tabWarehouse) tabWarehouse.classList.remove('active');
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'block';
         if (secPump) secPump.style.display = 'none';
+        if (secWarehouse) secWarehouse.style.display = 'none';
         if (rolloverBtn) rolloverBtn.style.display = 'none';
         if (haviOsszesito) haviOsszesito.style.display = 'none';
         if (primaryBtn) {
@@ -197,9 +314,11 @@ function switchWebTab(tabName) {
         if (tabElec) tabElec.classList.remove('active');
         if (tabClean) tabClean.classList.remove('active');
         if (tabPump) tabPump.classList.add('active');
+        if (tabWarehouse) tabWarehouse.classList.remove('active');
         if (secElec) secElec.style.display = 'none';
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'block';
+        if (secWarehouse) secWarehouse.style.display = 'none';
         if (rolloverBtn) rolloverBtn.style.display = 'none';
         if (haviOsszesito) haviOsszesito.style.display = 'none';
         if (primaryBtn) {
@@ -209,13 +328,30 @@ function switchWebTab(tabName) {
             primaryBtn.style.display = 'inline-block';
         }
         renderPumpTable();
+    } else if (tabName === 'pump_warehouse') {
+        if (tabElec) tabElec.classList.remove('active');
+        if (tabClean) tabClean.classList.remove('active');
+        if (tabPump) tabPump.classList.remove('active');
+        if (tabWarehouse) tabWarehouse.classList.add('active');
+        if (secElec) secElec.style.display = 'none';
+        if (secClean) secClean.style.display = 'none';
+        if (secPump) secPump.style.display = 'none';
+        if (secWarehouse) secWarehouse.style.display = 'block';
+        if (rolloverBtn) rolloverBtn.style.display = 'none';
+        if (haviOsszesito) haviOsszesito.style.display = 'none';
+        if (primaryBtn) {
+            primaryBtn.style.display = 'none';
+        }
+        renderPumpWarehouseTable();
     } else {
         if (tabElec) tabElec.classList.add('active');
         if (tabClean) tabClean.classList.remove('active');
         if (tabPump) tabPump.classList.remove('active');
+        if (tabWarehouse) tabWarehouse.classList.remove('active');
         if (secElec) secElec.style.display = 'block';
         if (secClean) secClean.style.display = 'none';
         if (secPump) secPump.style.display = 'none';
+        if (secWarehouse) secWarehouse.style.display = 'none';
         if (rolloverBtn) rolloverBtn.style.display = 'inline-flex';
         if (haviOsszesito) haviOsszesito.style.display = 'inline-flex';
         if (primaryBtn) {
@@ -732,7 +868,9 @@ function calculateCleaningDaysAgo(timestamp, dateString) {
 }
 
 function getCleaningStatusBadgeHTML(daysAgo) {
-    if (daysAgo <= 30) {
+    if (daysAgo === 9999) {
+        return `<span class="badge-status badge-overdue">⚠️ Esedékes - Még nincs adat</span>`;
+    } else if (daysAgo <= 30) {
         const text = daysAgo === 0 ? 'Rendben - Ma' : `Rendben - ${daysAgo} napja`;
         return `<span class="badge-status badge-ok">✓ ${text}</span>`;
     } else if (daysAgo <= 60) {
@@ -742,7 +880,7 @@ function getCleaningStatusBadgeHTML(daysAgo) {
     }
 }
 
-function openLocationCleaningHistoryModal(groupKey) {
+function openLocationCleaningHistoryModal(groupKey, town, street) {
     currentHistoryLocationKey = groupKey;
     const modal = document.getElementById('locationCleaningHistoryModal');
     const titleEl = document.getElementById('locationCleaningHistoryTitle');
@@ -752,32 +890,40 @@ function openLocationCleaningHistoryModal(groupKey) {
     if (!modal || !tbody) return;
     tbody.innerHTML = '';
 
+    const parts = groupKey.split('_');
+    const displayTown = town || (parts[0] || 'Apaj');
+    const displayStreet = street || (parts.slice(1).join(' ') || 'Helyszín');
+
     const records = cleaningRecords.filter(r => `${normalizeStreetName(r.settlementName)}_${normalizeStreetName(r.streetName)}` === groupKey);
     records.sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
 
-    if (records.length > 0) {
-        if (titleEl) titleEl.innerHTML = `${TRUCK_SVG_ICON} ${records[0].settlementName} • ${records[0].streetName}`;
-        if (subtitleEl) subtitleEl.textContent = `Összesen ${records.length} korábbi takarítás rögzítve`;
-    }
+    if (titleEl) titleEl.innerHTML = `${TRUCK_SVG_ICON} ${displayTown} • ${displayStreet}`;
+    if (subtitleEl) subtitleEl.textContent = `Összesen ${records.length} korábbi takarítás rögzítve`;
 
-    records.forEach(rec => {
+    if (records.length === 0) {
         const row = document.createElement('tr');
-        row.style.cursor = 'pointer';
-        row.title = 'Duplán kattintva szerkesztheted ezt a korábbi takarítási adatot!';
-        row.ondblclick = () => {
-            openCleaningEditModal(rec.id);
-            closeLocationCleaningHistoryModal();
-        };
-        row.innerHTML = `
-            <td><strong>${rec.dateString}</strong></td>
-            <td><strong style="color: #0077b6; white-space: nowrap;">${rec.userName || 'Mizsei Márk'}</strong></td>
-            <td>${rec.note || '-'}</td>
-            <td style="text-align: center; white-space: nowrap;">
-                <button onclick="event.stopPropagation(); deleteCleaningRecordFromWeb('${rec.id}'); closeLocationCleaningHistoryModal();" class="btn-icon-delete" title="Törlés">🗑</button>
-            </td>
-        `;
+        row.innerHTML = `<td colspan="4" style="text-align: center; color: #64748b; padding: 20px;">Még nincs rögzített tisztítási előzmény ehhez a helyszínhez.</td>`;
         tbody.appendChild(row);
-    });
+    } else {
+        records.forEach(rec => {
+            const row = document.createElement('tr');
+            row.style.cursor = 'pointer';
+            row.title = 'Duplán kattintva szerkesztheted ezt a korábbi takarítási adatot!';
+            row.ondblclick = () => {
+                openCleaningEditModal(rec.id);
+                closeLocationCleaningHistoryModal();
+            };
+            row.innerHTML = `
+                <td><strong>${rec.dateString}</strong></td>
+                <td><strong style="color: #0077b6; white-space: nowrap;">${rec.userName || 'Mizsei Márk'}</strong></td>
+                <td>${rec.note || '-'}</td>
+                <td style="text-align: center; white-space: nowrap;">
+                    <button onclick="event.stopPropagation(); deleteCleaningRecordFromWeb('${rec.id}'); closeLocationCleaningHistoryModal();" class="btn-icon-delete" title="Törlés">🗑</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
 
     modal.style.display = 'flex';
 }
@@ -797,33 +943,58 @@ function renderCleaningTable() {
     if (!tbody) return;
     tbody.innerHTML = '';
 
-    // Group all cleaning records by location
-    const groupedMap = new Map();
-    cleaningRecords.forEach(r => {
-        const key = `${normalizeStreetName(r.settlementName)}_${normalizeStreetName(r.streetName)}`;
-        if (!groupedMap.has(key)) {
-            groupedMap.set(key, []);
-        }
-        groupedMap.get(key).push(r);
-    });
-
     const allGroupedLocations = [];
-    groupedMap.forEach((records, key) => {
-        const sortedHistory = [...records].sort((a, b) => (b.timestamp || 0) - (a.timestamp || 0));
-        const latest = sortedHistory[0];
-        const daysAgo = calculateCleaningDaysAgo(latest.timestamp, latest.dateString);
-        let status = 'OK';
-        if (daysAgo > 60) status = 'OVERDUE';
-        else if (daysAgo >= 31) status = 'WARNING';
+    const towns = Object.keys(streetMapData);
 
-        allGroupedLocations.push({
-            key: key,
-            settlementName: latest.settlementName || 'Apaj',
-            streetName: latest.streetName || 'Helyszín',
-            latestRecord: latest,
-            daysAgo: daysAgo,
-            status: status,
-            historyRecords: sortedHistory
+    towns.forEach(town => {
+        const streets = streetMapData[town] || [];
+        const normTown = normalizeStreetName(town);
+
+        streets.forEach(street => {
+            const normStreet = normalizeStreetName(street);
+            const key = `${normTown}_${normStreet}`;
+
+            // Find all matching cleaning records for this town and street
+            const matchingRecords = cleaningRecords.filter(r =>
+                normalizeStreetName(r.settlementName) === normTown &&
+                normalizeStreetName(r.streetName) === normStreet
+            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+            if (matchingRecords.length > 0) {
+                const latest = matchingRecords[0];
+                const daysAgo = calculateCleaningDaysAgo(latest.timestamp, latest.dateString);
+                let status = 'OK';
+                if (daysAgo > 60) status = 'OVERDUE';
+                else if (daysAgo >= 31) status = 'WARNING';
+
+                allGroupedLocations.push({
+                    key: key,
+                    settlementName: town,
+                    streetName: street,
+                    latestRecord: latest,
+                    daysAgo: daysAgo,
+                    status: status,
+                    historyRecords: matchingRecords
+                });
+            } else {
+                // Street has no cleaning record yet
+                allGroupedLocations.push({
+                    key: key,
+                    settlementName: town,
+                    streetName: street,
+                    latestRecord: {
+                        id: '',
+                        settlementName: town,
+                        streetName: street,
+                        dateString: 'Még nincs adat',
+                        userName: '-',
+                        note: 'Még nincs tisztítási előzmény rögzítve'
+                    },
+                    daysAgo: 9999,
+                    status: 'OVERDUE',
+                    historyRecords: []
+                });
+            }
         });
     });
 
@@ -884,15 +1055,7 @@ function renderCleaningTable() {
             );
         }
 
-        // Default sort: Overdue (>60 days) at the top!
-        // OVERDUE (3) > WARNING (2) > OK (1), then by daysAgo descending
-        filtered.sort((a, b) => {
-            const priorityMap = { OVERDUE: 3, WARNING: 2, OK: 1 };
-            const pDiff = (priorityMap[b.status] || 0) - (priorityMap[a.status] || 0);
-            if (pDiff !== 0) return pDiff;
-            return b.daysAgo - a.daysAgo;
-        });
-
+        // Stable town and street order so streets NEVER jump to another page when a new cleaning is added
         const totalCount = filtered.length;
         const { startIndex, endIndex, validPage } = buildPaginationControls(
             'cleaningPaginationControls',
@@ -923,9 +1086,11 @@ function renderCleaningTable() {
             row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
             row.onclick = (e) => {
                 if (e.target.tagName !== 'BUTTON' && !e.target.closest('button')) {
-                    openLocationCleaningHistoryModal(loc.key);
+                    openLocationCleaningHistoryModal(loc.key, loc.settlementName, loc.streetName);
                 }
             };
+            const escapedTown = (loc.settlementName || '').replace(/'/g, "\\'");
+            const escapedStreet = (loc.streetName || '').replace(/'/g, "\\'");
             row.innerHTML = `
                 <td><strong>${loc.latestRecord.dateString}</strong></td>
                 <td>${getCleaningStatusBadgeHTML(loc.daysAgo)}</td>
@@ -934,7 +1099,7 @@ function renderCleaningTable() {
                 <td>${loc.latestRecord.note || '-'}</td>
                 <td style="white-space: nowrap;"><strong style="color: #0077b6;">${loc.latestRecord.userName || 'Mizsei Márk'}</strong></td>
                 <td style="text-align: center; white-space: nowrap;">
-                    <button onclick="openLocationCleaningHistoryModal('${loc.key}')" class="btn-icon-edit" style="width: auto; padding: 4px 10px; font-weight: bold; font-size: 12px; height: auto;" title="Előzmények megtekintése">
+                    <button onclick="openLocationCleaningHistoryModal('${loc.key}', '${escapedTown}', '${escapedStreet}')" class="btn-icon-edit" style="width: auto; padding: 4px 10px; font-weight: bold; font-size: 12px; height: auto;" title="Előzmények megtekintése">
                         📝 ${loc.historyRecords.length} előzmény
                     </button>
                 </td>
@@ -1089,11 +1254,19 @@ function openPumpVisualView(town, street) {
 
     const p1Type = record ? (record.pump1Type || '') : '';
     const p1Serial = record ? (record.pump1Serial || '') : '';
+    const p1Model = record ? (record.pump1Model || '') : '';
+    const p1Impeller = record ? (record.pump1Impeller || '') : '';
+    const p1Owner = record ? (record.pump1Owner || '') : '';
+
     const p2Type = record ? (record.pump2Type || '') : '';
     const p2Serial = record ? (record.pump2Serial || '') : '';
+    const p2Model = record ? (record.pump2Model || '') : '';
+    const p2Impeller = record ? (record.pump2Impeller || '') : '';
+    const p2Owner = record ? (record.pump2Owner || '') : '';
+
     const pNote = record ? (record.note || '') : '';
 
-    renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote);
+    renderVisualCardDOM(p1Type, p1Serial, p1Model, p1Impeller, p1Owner, p2Type, p2Serial, p2Model, p2Impeller, p2Owner, pNote);
 
     visualContainer.style.display = 'block';
     visualContainer.scrollIntoView({ behavior: 'smooth' });
@@ -1119,12 +1292,20 @@ function clearWebInput(inputId) {
 function saveCurrentVisualPump(shouldReRender = false) {
     const p1Type = document.getElementById('webP1Type') ? document.getElementById('webP1Type').value : '';
     const p1Serial = document.getElementById('webP1Serial') ? document.getElementById('webP1Serial').value : '';
+    const p1Model = document.getElementById('webP1Model') ? document.getElementById('webP1Model').value : '';
+    const p1Impeller = document.getElementById('webP1Impeller') ? document.getElementById('webP1Impeller').value : '';
+    const p1Owner = document.getElementById('webP1Owner') ? document.getElementById('webP1Owner').value : '';
+
     const p2Type = document.getElementById('webP2Type') ? document.getElementById('webP2Type').value : '';
     const p2Serial = document.getElementById('webP2Serial') ? document.getElementById('webP2Serial').value : '';
+    const p2Model = document.getElementById('webP2Model') ? document.getElementById('webP2Model').value : '';
+    const p2Impeller = document.getElementById('webP2Impeller') ? document.getElementById('webP2Impeller').value : '';
+    const p2Owner = document.getElementById('webP2Owner') ? document.getElementById('webP2Owner').value : '';
+
     const pNote = document.getElementById('webPNote') ? document.getElementById('webPNote').value : '';
 
     if (shouldReRender) {
-        renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote);
+        renderVisualCardDOM(p1Type, p1Serial, p1Model, p1Impeller, p1Owner, p2Type, p2Serial, p2Model, p2Impeller, p2Owner, pNote);
     }
 
     const docId = `${currentVisualTown}_${currentVisualStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
@@ -1136,11 +1317,17 @@ function saveCurrentVisualPump(shouldReRender = false) {
         pump1State: currentP1State,
         pump1Type: p1Type,
         pump1Serial: p1Serial,
+        pump1Model: p1Model,
+        pump1Impeller: p1Impeller,
+        pump1Owner: p1Owner,
         pump1RemoveDate: "",
         pump1Pos: 1,
         pump2State: currentP2State,
         pump2Type: p2Type,
         pump2Serial: p2Serial,
+        pump2Model: p2Model,
+        pump2Impeller: p2Impeller,
+        pump2Owner: p2Owner,
         pump2RemoveDate: "",
         pump2Pos: 2,
         note: pNote,
@@ -1165,7 +1352,7 @@ function saveCurrentVisualPump(shouldReRender = false) {
     }, 200);
 }
 
-function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote) {
+function renderVisualCardDOM(p1Type, p1Serial, p1Model, p1Impeller, p1Owner, p2Type, p2Serial, p2Model, p2Impeller, p2Owner, pNote) {
     const visualContainer = document.getElementById('pumpVisualContainer');
     if (!visualContainer) return;
 
@@ -1177,8 +1364,14 @@ function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote) {
     const p2ChipText = currentP2State === 1 ? '● Üzemel' : (currentP2State === 2 ? '● Hibás' : 'Nincs szivattyú');
     const p2ChipColor = '#ffffff';
 
+    const defaultTowns = ["Apaj", "Kunszentmiklós", "Apostag", "Dunavecse", "Szabadszállás", "Kunadacs", "Szalkszentmárton", "Tass", "Kunpeszér"];
+    const allTownOptions = [...new Set([...defaultTowns, ...Object.keys(streetMapData)])].sort();
+
+    const p1OwnerOptionsHTML = ['<option value="">-- Válassz települést --</option>', ...allTownOptions.map(t => `<option value="${t}" ${t === p1Owner ? 'selected' : ''}>${t}</option>`)].join('');
+    const p2OwnerOptionsHTML = ['<option value="">-- Válassz települést --</option>', ...allTownOptions.map(t => `<option value="${t}" ${t === p2Owner ? 'selected' : ''}>${t}</option>`)].join('');
+
     visualContainer.innerHTML = `
-        <div style="background: #ffffff; border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 600px; margin: 0 auto; overflow: hidden; border: 1px solid #cbd5e1;">
+        <div class="visual-modal-card" style="border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 600px; margin: 0 auto; overflow: hidden; border: 1px solid #cbd5e1;">
             <div style="background: #0077b6; padding: 16px 20px; color: white; display: flex; justify-content: space-between; align-items: center;">
                 <div>
                     <h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #ffffff;">${currentVisualStreet}</h3>
@@ -1189,52 +1382,94 @@ function renderVisualCardDOM(p1Type, p1Serial, p2Type, p2Serial, pNote) {
 
             <div style="padding: 20px;">
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;">
-                        <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">1. sz. Szivattyú</h4>
+                    <!-- 1. KOCKA (1. sz. Szivattyú) -->
+                    <div class="pump-card-box" style="border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;">
+                        <h4 class="pump-card-title" style="font-size: 15px; font-weight: 600; margin-bottom: 8px;">1. sz. Szivattyú</h4>
                         <div onclick="cycleWebCube(1)" title="Kattints a státusz váltásához!" style="background: ${p1ChipBg}; color: ${p1ChipColor}; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; display: inline-block; margin-bottom: 14px; user-select: none;">
                             ${p1ChipText}
                         </div>
                         <div style="text-align: left; margin-bottom: 12px;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Fajtája</label>
+                            <label class="pump-field-label">Fajtája</label>
                             <div style="position: relative;">
                                 <input type="text" id="webP1Type" value="${p1Type}" list="pumpTypeOptions" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
                                 ${p1Type ? '<span onclick="clearWebInput(\'webP1Type\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
                             </div>
                         </div>
-                        <div style="text-align: left;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Gyári száma</label>
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label class="pump-field-label">Gyári száma</label>
                             <div style="position: relative;">
                                 <input type="text" id="webP1Serial" value="${p1Serial}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
                                 ${p1Serial ? '<span onclick="clearWebInput(\'webP1Serial\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
                             </div>
                         </div>
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label class="pump-field-label">Típus</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP1Model" value="${p1Model}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p1Model ? '<span onclick="clearWebInput(\'webP1Model\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
+                        </div>
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label class="pump-field-label">Járókerék száma</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP1Impeller" value="${p1Impeller}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p1Impeller ? '<span onclick="clearWebInput(\'webP1Impeller\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
+                        </div>
+                        <div style="text-align: left;">
+                            <label class="pump-field-label">Tulajdonos</label>
+                            <select id="webP1Owner" onchange="saveCurrentVisualPump(false)" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; font-weight: 600;">
+                                ${p1OwnerOptionsHTML}
+                            </select>
+                        </div>
                     </div>
 
-                    <div style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;">
-                        <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin-bottom: 8px;">2. sz. Szivattyú</h4>
+                    <!-- 2. KOCKA (2. sz. Szivattyú) -->
+                    <div class="pump-card-box" style="border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center;">
+                        <h4 class="pump-card-title" style="font-size: 15px; font-weight: 600; margin-bottom: 8px;">2. sz. Szivattyú</h4>
                         <div onclick="cycleWebCube(2)" title="Kattints a státusz váltásához!" style="background: ${p2ChipBg}; color: ${p2ChipColor}; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 12px; cursor: pointer; display: inline-block; margin-bottom: 14px; user-select: none;">
                             ${p2ChipText}
                         </div>
                         <div style="text-align: left; margin-bottom: 12px;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Fajtája</label>
+                            <label class="pump-field-label">Fajtája</label>
                             <div style="position: relative;">
                                 <input type="text" id="webP2Type" value="${p2Type}" list="pumpTypeOptions" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
                                 ${p2Type ? '<span onclick="clearWebInput(\'webP2Type\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
                             </div>
                         </div>
-                        <div style="text-align: left;">
-                            <label style="display: block; font-size: 11px; font-weight: 600; color: #64748b; margin-bottom: 4px;">Gyári száma</label>
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label class="pump-field-label">Gyári száma</label>
                             <div style="position: relative;">
                                 <input type="text" id="webP2Serial" value="${p2Serial}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
                                 ${p2Serial ? '<span onclick="clearWebInput(\'webP2Serial\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
                             </div>
                         </div>
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label class="pump-field-label">Típus</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP2Model" value="${p2Model}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p2Model ? '<span onclick="clearWebInput(\'webP2Model\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
+                        </div>
+                        <div style="text-align: left; margin-bottom: 12px;">
+                            <label class="pump-field-label">Járókerék száma</label>
+                            <div style="position: relative;">
+                                <input type="text" id="webP2Impeller" value="${p2Impeller}" oninput="saveCurrentVisualPump(false)" placeholder="" style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                                ${p2Impeller ? '<span onclick="clearWebInput(\'webP2Impeller\')" style="position: absolute; right: 10px; top: 50%; transform: translateY(-50%); color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
+                            </div>
+                        </div>
+                        <div style="text-align: left;">
+                            <label class="pump-field-label">Tulajdonos</label>
+                            <select id="webP2Owner" onchange="saveCurrentVisualPump(false)" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; font-weight: 600;">
+                                ${p2OwnerOptionsHTML}
+                            </select>
+                        </div>
                     </div>
                 </div>
 
                 <!-- 3. KOCKA (Megjegyzés) -->
-                <div style="margin-top: 16px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
-                    <label style="display: block; font-size: 13px; font-weight: bold; color: #1e293b; margin-bottom: 6px;">📝 Megjegyzés / Észrevételek</label>
+                <div class="pump-note-box" style="margin-top: 16px; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                    <label class="pump-card-title" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">📝 Megjegyzés / Észrevételek</label>
                     <div style="position: relative;">
                         <textarea id="webPNote" oninput="saveCurrentVisualPump(false)" placeholder="Írj megjegyzést a szivattyúk állapotáról..." style="width: 100%; padding: 10px 32px 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; resize: vertical; min-height: 60px;">${pNote || ''}</textarea>
                         ${pNote ? '<span onclick="clearWebInput(\'webPNote\')" style="position: absolute; right: 10px; top: 12px; color: #94a3b8; font-weight: bold; cursor: pointer; font-size: 14px;">✕</span>' : ''}
@@ -1788,9 +2023,15 @@ function initDashboard() {
                         pump1State: Number(data.pump1State || 0),
                         pump1Type: data.pump1Type || "",
                         pump1Serial: data.pump1Serial || "",
+                        pump1Model: data.pump1Model || "",
+                        pump1Impeller: data.pump1Impeller || "",
+                        pump1Owner: data.pump1Owner || "",
                         pump2State: Number(data.pump2State || 0),
                         pump2Type: data.pump2Type || "",
                         pump2Serial: data.pump2Serial || "",
+                        pump2Model: data.pump2Model || "",
+                        pump2Impeller: data.pump2Impeller || "",
+                        pump2Owner: data.pump2Owner || "",
                         note: data.note || "",
                         userEmail: rawEmail,
                         userName: resolveDisplayName(rawName, rawEmail)
@@ -1802,10 +2043,560 @@ function initDashboard() {
                 console.warn("Firestore pump_records snapshot error:", error);
             });
 
+            db.collection("pump_warehouse").onSnapshot((snapshot) => {
+                const list = [];
+                snapshot.forEach((doc) => {
+                    const data = doc.data();
+                    const rawEmail = (data.userEmail || "").trim().toLowerCase();
+                    const rawName = (data.userName || "").trim();
+
+                    list.push({
+                        id: doc.id,
+                        settlementName: data.settlementName || "Apaj",
+                        streetName: data.streetName || "Helyszín",
+                        dateString: data.dateString || "",
+                        timestamp: Number(data.timestamp) || 0,
+                        pumps: Array.isArray(data.pumps) ? data.pumps : [],
+                        note: data.note || "",
+                        userEmail: rawEmail,
+                        userName: resolveDisplayName(rawName, rawEmail)
+                    });
+                });
+                pumpWarehouseRecords = list;
+                renderPumpWarehouseTable();
+            }, (error) => {
+                console.warn("Firestore pump_warehouse snapshot error:", error);
+            });
+
         } catch (e) {
             console.warn("Firebase initialization warning:", e);
         }
     }
+}
+
+let pumpWarehouseRecords = [];
+let currentPumpWarehousePage = 1;
+let currentWarehouseVisualTown = '';
+let currentWarehouseVisualStreet = '';
+let currentWarehousePumps = [];
+let webWarehouseSaveTimeout = null;
+
+function openWarehouseVisualView(town, street) {
+    const visualContainer = document.getElementById('pumpWarehouseVisualContainer');
+    if (!visualContainer) return;
+
+    currentWarehouseVisualTown = (town || '').replace(/_/g, ' ');
+    currentWarehouseVisualStreet = (street || '').replace(/_/g, ' ');
+
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
+
+    let record = pumpWarehouseRecords.find(r =>
+        normalizeStreetName(r.settlementName) === normTown &&
+        normalizeStreetName(r.streetName) === normStreet
+    );
+
+    function populateFromRecord(rec) {
+        if (rec && Array.isArray(rec.pumps) && rec.pumps.length > 0) {
+            currentWarehousePumps = rec.pumps.map(p => {
+                const isActive = p.active !== undefined ? Boolean(p.active) : (Number(p.state) === 1);
+                return {
+                    state: isActive ? 1 : 0,
+                    active: isActive,
+                    type: p.fajta || p.type || '',
+                    fajta: p.fajta || p.type || '',
+                    serial: p.gyariSzam || p.serial || '',
+                    gyariSzam: p.gyariSzam || p.serial || '',
+                    model: p.tipus || p.model || '',
+                    tipus: p.tipus || p.model || '',
+                    impeller: p.jarokerekSzam || p.impeller || '',
+                    jarokerekSzam: p.jarokerekSzam || p.impeller || '',
+                    owner: p.tulajdonos || p.owner || '',
+                    tulajdonos: p.tulajdonos || p.owner || ''
+                };
+            });
+        } else {
+            currentWarehousePumps = [{
+                state: 0,
+                active: false,
+                type: '',
+                fajta: '',
+                serial: '',
+                gyariSzam: '',
+                model: '',
+                tipus: '',
+                impeller: '',
+                jarokerekSzam: '',
+                owner: '',
+                tulajdonos: ''
+            }];
+        }
+
+        const pNote = rec ? (rec.megjegyzes || rec.note || '') : '';
+        renderWarehouseCardDOM(pNote);
+    }
+
+    populateFromRecord(record);
+
+    visualContainer.style.display = 'block';
+    visualContainer.scrollIntoView({ behavior: 'smooth' });
+
+    // Live fetch from Firestore to ensure 100% fresh data on open
+    const docId = `${currentWarehouseVisualTown}_${currentWarehouseVisualStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    if (typeof firebase !== 'undefined') {
+        try {
+            firebase.firestore().collection("pump_warehouse").doc(docId).get()
+                .then(doc => {
+                    if (doc.exists) {
+                        const data = doc.data();
+                        const freshRecord = { id: doc.id, ...data };
+                        const existingIdx = pumpWarehouseRecords.findIndex(r => r.id === doc.id || (normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.streetName) === normStreet));
+                        if (existingIdx >= 0) {
+                            pumpWarehouseRecords[existingIdx] = freshRecord;
+                        } else {
+                            pumpWarehouseRecords.unshift(freshRecord);
+                        }
+                        populateFromRecord(freshRecord);
+                    }
+                })
+                .catch(err => {
+                    console.error("Firestore get error for warehouse doc:", err);
+                });
+        } catch (e) {
+            console.error("Firebase fetch error:", e);
+        }
+    }
+}
+
+function cycleWarehouseCube(index) {
+    if (currentWarehousePumps[index]) {
+        const nextState = currentWarehousePumps[index].state === 1 ? 0 : 1;
+        currentWarehousePumps[index].state = nextState;
+        currentWarehousePumps[index].active = nextState === 1;
+    }
+    saveCurrentWarehousePump(true);
+}
+
+function addWarehousePumpCard() {
+    currentWarehousePumps.push({
+        state: 0,
+        active: false,
+        type: '',
+        fajta: '',
+        serial: '',
+        gyariSzam: '',
+        model: '',
+        tipus: '',
+        impeller: '',
+        jarokerekSzam: '',
+        owner: '',
+        tulajdonos: ''
+    });
+    saveCurrentWarehousePump(true);
+}
+
+function removeWarehousePumpCard(index) {
+    if (currentWarehousePumps.length > 1) {
+        currentWarehousePumps.splice(index, 1);
+    } else {
+        currentWarehousePumps[0] = { state: 0, active: false, type: '', fajta: '', serial: '', gyariSzam: '', model: '', tipus: '', impeller: '', jarokerekSzam: '', owner: '', tulajdonos: '' };
+    }
+    saveCurrentWarehousePump(true);
+}
+
+function saveCurrentWarehousePump(shouldReRender = false) {
+    currentWarehousePumps.forEach((p, idx) => {
+        const typeEl = document.getElementById(`webWhType_${idx}`);
+        const serialEl = document.getElementById(`webWhSerial_${idx}`);
+        const modelEl = document.getElementById(`webWhModel_${idx}`);
+        const impellerEl = document.getElementById(`webWhImpeller_${idx}`);
+        const ownerEl = document.getElementById(`webWhOwner_${idx}`);
+
+        if (typeEl) { p.type = typeEl.value; p.fajta = typeEl.value; }
+        if (serialEl) { p.serial = serialEl.value; p.gyariSzam = serialEl.value; }
+        if (modelEl) { p.model = modelEl.value; p.tipus = modelEl.value; }
+        if (impellerEl) { p.impeller = impellerEl.value; p.jarokerekSzam = impellerEl.value; }
+        if (ownerEl) { p.owner = ownerEl.value; p.tulajdonos = ownerEl.value; }
+        p.active = Number(p.state) === 1;
+    });
+
+    const pNoteEl = document.getElementById('webWhPNote');
+    const pNote = pNoteEl ? pNoteEl.value : '';
+
+    if (shouldReRender) {
+        renderWarehouseCardDOM(pNote);
+    }
+
+    const docId = `${currentWarehouseVisualTown}_${currentWarehouseVisualStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+    const nowTs = Date.now();
+
+    const normalizedPumpsPayload = currentWarehousePumps.map(p => {
+        const isActive = Number(p.state) === 1 || Boolean(p.active);
+        return {
+            active: isActive,
+            state: isActive ? 1 : 0,
+            fajta: p.fajta || p.type || '',
+            type: p.fajta || p.type || '',
+            gyariSzam: p.gyariSzam || p.serial || '',
+            serial: p.gyariSzam || p.serial || '',
+            tipus: p.tipus || p.model || '',
+            model: p.tipus || p.model || '',
+            jarokerekSzam: p.jarokerekSzam || p.impeller || '',
+            impeller: p.jarokerekSzam || p.impeller || '',
+            tulajdonos: p.tulajdonos || p.owner || '',
+            owner: p.tulajdonos || p.owner || ''
+        };
+    });
+
+    const payload = {
+        telepules: currentWarehouseVisualTown,
+        utca: currentWarehouseVisualStreet,
+        settlementName: currentWarehouseVisualTown,
+        streetName: currentWarehouseVisualStreet,
+        pumps: normalizedPumpsPayload,
+        megjegyzes: pNote,
+        note: pNote,
+        dateString: dateStr,
+        userEmail: getLoggedInAdminEmail(),
+        userName: getLoggedInAdminName(),
+        updatedAt: nowTs,
+        timestamp: nowTs
+    };
+
+    const existingIdx = pumpWarehouseRecords.findIndex(r => r.id === docId || (normalizeStreetName(r.settlementName) === normalizeStreetName(currentWarehouseVisualTown) && normalizeStreetName(r.streetName) === normalizeStreetName(currentWarehouseVisualStreet)));
+    if (existingIdx >= 0) {
+        pumpWarehouseRecords[existingIdx] = { ...pumpWarehouseRecords[existingIdx], ...payload, id: docId };
+    } else {
+        pumpWarehouseRecords.unshift({ id: docId, ...payload });
+    }
+
+    renderPumpWarehouseTable();
+
+    // 400ms Debounced Automatic Auto-Save to Firestore
+    if (webWarehouseSaveTimeout) clearTimeout(webWarehouseSaveTimeout);
+    webWarehouseSaveTimeout = setTimeout(async () => {
+        if (typeof firebase !== 'undefined') {
+            try {
+                const db = firebase.firestore();
+                await db.collection("pump_warehouse").doc(docId).set(payload, { merge: true });
+                console.log("✔ Auto-saved to Firestore (pump_warehouse):", docId);
+            } catch (err) {
+                console.error("❌ Firestore auto-save error (pump_warehouse):", err);
+                alert("Mentési hiba: " + (err.message || err));
+            }
+        }
+    }, 400);
+}
+
+function renderWarehouseCardDOM(pNote) {
+    const visualContainer = document.getElementById('pumpWarehouseVisualContainer');
+    if (!visualContainer) return;
+
+    const defaultTowns = ["Apaj", "Kunszentmiklós", "Apostag", "Dunavecse", "Szabadszállás", "Kunadacs", "Szalkszentmárton", "Tass", "Kunpeszér"];
+    const allTownOptions = [...new Set([...defaultTowns, ...Object.keys(streetMapData)])].sort();
+
+    let cardsHTML = '';
+
+    currentWarehousePumps.forEach((p, idx) => {
+        const chipClass = Number(p.state) === 1 || Boolean(p.active) ? 'chip-van' : 'chip-nincs';
+        const chipText = Number(p.state) === 1 || Boolean(p.active) ? '● Van' : '● Nincs';
+        const pOwnerVal = p.tulajdonos || p.owner || '';
+
+        const ownerOptionsHTML = ['<option value="">-- Válassz települést --</option>', ...allTownOptions.map(t => `<option value="${t}" ${t === pOwnerVal ? 'selected' : ''}>${t}</option>`)].join('');
+
+        cardsHTML += `
+            <div class="warehouse-card-box" style="background: #ffffff; border: 1px solid #cbd5e1; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04); text-align: center; position: relative;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                    <h4 style="font-size: 15px; font-weight: 600; color: #1e293b; margin: 0;">${idx + 1}. sz. Tartalék szivattyú</h4>
+                    ${currentWarehousePumps.length > 1 ? `<button onclick="removeWarehousePumpCard(${idx})" title="Törlés" style="background: #fee2e2; color: #dc2626; border: 1px solid #fca5a5; border-radius: 6px; padding: 2px 8px; font-size: 12px; font-weight: bold; cursor: pointer;">🗑 Törlés</button>` : ''}
+                </div>
+                <div onclick="cycleWarehouseCube(${idx})" title="Kattints a státusz váltásához (Van / Nincs)!" class="wh-status-chip ${chipClass}">
+                    ${chipText}
+                </div>
+                <div style="text-align: left; margin-bottom: 12px;">
+                    <label class="pump-field-label">Fajtája</label>
+                    <input type="text" id="webWhType_${idx}" value="${p.fajta || p.type || ''}" list="pumpTypeOptions" oninput="saveCurrentWarehousePump(false)" placeholder="" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                </div>
+                <div style="text-align: left; margin-bottom: 12px;">
+                    <label class="pump-field-label">Gyári száma</label>
+                    <input type="text" id="webWhSerial_${idx}" value="${p.gyariSzam || p.serial || ''}" oninput="saveCurrentWarehousePump(false)" placeholder="" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                </div>
+                <div style="text-align: left; margin-bottom: 12px;">
+                    <label class="pump-field-label">Típus</label>
+                    <input type="text" id="webWhModel_${idx}" value="${p.tipus || p.model || ''}" oninput="saveCurrentWarehousePump(false)" placeholder="" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                </div>
+                <div style="text-align: left; margin-bottom: 12px;">
+                    <label class="pump-field-label">Járókerék száma</label>
+                    <input type="text" id="webWhImpeller_${idx}" value="${p.jarokerekSzam || p.impeller || ''}" oninput="saveCurrentWarehousePump(false)" placeholder="" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
+                </div>
+                <div style="text-align: left;">
+                    <label class="pump-field-label">Tulajdonos</label>
+                    <select id="webWhOwner_${idx}" onchange="saveCurrentWarehousePump(false)" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; background: #ffffff; color: #0f172a; font-weight: 600;">
+                        ${ownerOptionsHTML}
+                    </select>
+                </div>
+            </div>
+        `;
+    });
+
+    visualContainer.innerHTML = `
+        <div class="visual-modal-card" style="border-radius: 16px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); max-width: 680px; margin: 0 auto; overflow: hidden; border: 1px solid #cbd5e1;">
+            <div style="background: #0077b6; padding: 16px 20px; color: white; display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h3 style="font-size: 20px; font-weight: bold; margin: 0; color: #ffffff;">${currentWarehouseVisualStreet}</h3>
+                    <p style="font-size: 13px; color: #e0f7fa; margin-top: 2px;">${currentWarehouseVisualTown} • Szivattyú Raktár (Tartalék szivattyúk)</p>
+                </div>
+                <button onclick="document.getElementById('pumpWarehouseVisualContainer').style.display='none'" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; cursor: pointer; font-size: 13px;">✕ Bezárás</button>
+            </div>
+
+            <div style="padding: 20px;">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+                    ${cardsHTML}
+                </div>
+
+                <div style="margin-top: 16px; text-align: center;">
+                    <button onclick="addWarehousePumpCard()" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 6px;">
+                        ➕ Új tartalék szivattyú hozzáadása
+                    </button>
+                </div>
+
+                <div class="pump-note-box" style="margin-top: 16px; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+                    <label class="pump-card-title" style="display: block; font-size: 13px; font-weight: bold; margin-bottom: 6px;">📝 Megjegyzés / Észrevételek</label>
+                    <textarea id="webWhPNote" oninput="saveCurrentWarehousePump(false)" placeholder="Írj megjegyzést a raktári szivattyúkról..." style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; resize: vertical; min-height: 60px;">${pNote || ''}</textarea>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function renderPumpWarehouseTable() {
+    const tbody = document.getElementById('pumpWarehouseTableBody');
+    const plantFilter = document.getElementById('pumpWarehousePlantFilter') ? document.getElementById('pumpWarehousePlantFilter').value : 'ALL';
+    const statusFilter = document.getElementById('pumpWarehouseStatusFilter') ? document.getElementById('pumpWarehouseStatusFilter').value : 'ALL';
+    const searchQuery = document.getElementById('pumpWarehouseSearch') ? document.getElementById('pumpWarehouseSearch').value.trim().toLowerCase() : '';
+    const pageSizeVal = document.getElementById('pumpWarehousePageSize') ? document.getElementById('pumpWarehousePageSize').value : '25';
+
+    if (!tbody) return;
+    tbody.innerHTML = '';
+
+    const townsToInclude = (plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter])
+        .sort((a, b) => a.localeCompare(b, 'hu'));
+
+    let allRows = [];
+
+    townsToInclude.forEach(town => {
+        const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+        streets.forEach(street => {
+            const normTown = normalizeStreetName(town);
+            const normStreet = normalizeStreetName(street);
+
+            const record = pumpWarehouseRecords.find(r =>
+                normalizeStreetName(r.settlementName) === normTown &&
+                normalizeStreetName(r.streetName) === normStreet
+            );
+
+            const pumps = record && Array.isArray(record.pumps) ? record.pumps : [];
+            const hasVan = pumps.some(p => Number(p.state) === 1);
+            const statusKey = hasVan ? 'VAN' : 'NINCS';
+            const statusBadge = hasVan
+                ? '<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">● Van</span>'
+                : '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 5px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">● Nincs</span>';
+
+            let pumpsSummary = '-';
+            if (pumps.length > 0) {
+                const activePumps = pumps.filter(p => p.type || p.serial || p.model || p.owner);
+                if (activePumps.length > 0) {
+                    pumpsSummary = activePumps.map((p, i) => {
+                        const parts = [p.type, p.model, p.serial, p.impeller ? `j.k: ${p.impeller}` : '', p.owner ? `tul: ${p.owner}` : ''].filter(Boolean).join(' | ');
+                        return `<div><strong>${i + 1}.</strong> ${parts || 'Tartalék szivattyú'}</div>`;
+                    }).join('');
+                }
+            }
+
+            allRows.push({
+                town: town,
+                street: street,
+                statusKey: statusKey,
+                statusBadge: statusBadge,
+                pumpsSummary: pumpsSummary,
+                note: record ? (record.note || '-') : '-',
+                dateString: record ? (record.dateString || '-') : '-',
+                userName: record ? (record.userName || '-') : '-'
+            });
+        });
+    });
+
+    if (statusFilter !== 'ALL') {
+        allRows = allRows.filter(r => r.statusKey === statusFilter);
+    }
+
+    if (searchQuery) {
+        allRows = allRows.filter(r =>
+            (r.town || '').toLowerCase().includes(searchQuery) ||
+            (r.street || '').toLowerCase().includes(searchQuery) ||
+            (r.statusKey || '').toLowerCase().includes(searchQuery) ||
+            (r.pumpsSummary || '').toLowerCase().includes(searchQuery) ||
+            (r.note || '').toLowerCase().includes(searchQuery) ||
+            (r.userName || '').toLowerCase().includes(searchQuery)
+        );
+    }
+
+    const totalCount = allRows.length;
+    const { startIndex, endIndex, validPage } = buildPaginationControls(
+        'pumpWarehousePaginationControls',
+        'pumpWarehouseSummaryCount',
+        currentPumpWarehousePage,
+        totalCount,
+        pageSizeVal,
+        (newPage) => {
+            currentPumpWarehousePage = newPage;
+            renderPumpWarehouseTable();
+        },
+        'raktári helyszín'
+    );
+    currentPumpWarehousePage = validPage;
+
+    const displayList = allRows.slice(startIndex, endIndex);
+
+    if (displayList.length === 0) {
+        const row = document.createElement('tr');
+        row.innerHTML = `<td colspan="7" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Nincs a szűrésnek megfelelő raktári szivattyú adat.</td>`;
+        tbody.appendChild(row);
+        return;
+    }
+
+    displayList.forEach(item => {
+        const row = document.createElement('tr');
+        row.style.cursor = 'pointer';
+        row.title = 'Kattints a sorra a raktári szivattyúk szerkesztéséhez!';
+        row.onclick = () => {
+            openWarehouseVisualView(item.town, item.street);
+        };
+        row.innerHTML = `
+            <td><strong>${item.dateString}</strong></td>
+            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">📦 ${item.town}</span></td>
+            <td><strong>${item.street}</strong></td>
+            <td>${item.statusBadge}</td>
+            <td style="font-size: 13px; font-weight: 500;">${item.pumpsSummary}</td>
+            <td style="color: #334155; font-size: 13px; font-weight: 500;">${item.note}</td>
+            <td style="white-space: nowrap;"><strong style="color: #0077b6;">${item.userName}</strong></td>
+        `;
+        tbody.appendChild(row);
+    });
+}
+
+function exportWarehouseToExcel() {
+    const plantFilter = document.getElementById('pumpWarehousePlantFilter') ? document.getElementById('pumpWarehousePlantFilter').value : 'ALL';
+    const statusFilter = document.getElementById('pumpWarehouseStatusFilter') ? document.getElementById('pumpWarehouseStatusFilter').value : 'ALL';
+    const searchQuery = document.getElementById('pumpWarehouseSearch') ? document.getElementById('pumpWarehouseSearch').value.trim().toLowerCase() : '';
+
+    const townsToInclude = (plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter])
+        .sort((a, b) => a.localeCompare(b, 'hu'));
+
+    let exportRows = [];
+
+    townsToInclude.forEach(town => {
+        const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+        streets.forEach(street => {
+            const normTown = normalizeStreetName(town);
+            const normStreet = normalizeStreetName(street);
+
+            const record = pumpWarehouseRecords.find(r =>
+                normalizeStreetName(r.settlementName) === normTown &&
+                normalizeStreetName(r.streetName) === normStreet
+            );
+
+            const pumps = record && Array.isArray(record.pumps) ? record.pumps : [];
+
+            pumps.forEach((p, idx) => {
+                exportRows.push({
+                    town: town,
+                    street: street,
+                    status: Number(p.state) === 1 ? 'Van' : 'Nincs',
+                    pumpNum: `${idx + 1}. sz. Tartalék`,
+                    type: p.type || '',
+                    serial: p.serial || '',
+                    model: p.model || '',
+                    impeller: p.impeller || '',
+                    owner: p.owner || '',
+                    note: record ? (record.note || '') : ''
+                });
+            });
+
+            if (pumps.length === 0) {
+                exportRows.push({
+                    town: town,
+                    street: street,
+                    status: 'Nincs',
+                    pumpNum: '1. sz. Tartalék',
+                    type: '',
+                    serial: '',
+                    model: '',
+                    impeller: '',
+                    owner: '',
+                    note: record ? (record.note || '') : ''
+                });
+            }
+        });
+    });
+
+    if (statusFilter !== 'ALL') {
+        exportRows = exportRows.filter(r => (statusFilter === 'VAN' && r.status === 'Van') || (statusFilter === 'NINCS' && r.status === 'Nincs'));
+    }
+
+    if (searchQuery) {
+        exportRows = exportRows.filter(r =>
+            (r.town || '').toLowerCase().includes(searchQuery) ||
+            (r.street || '').toLowerCase().includes(searchQuery) ||
+            (r.status || '').toLowerCase().includes(searchQuery) ||
+            (r.type || '').toLowerCase().includes(searchQuery) ||
+            (r.serial || '').toLowerCase().includes(searchQuery) ||
+            (r.model || '').toLowerCase().includes(searchQuery) ||
+            (r.owner || '').toLowerCase().includes(searchQuery) ||
+            (r.note || '').toLowerCase().includes(searchQuery)
+        );
+    }
+
+    if (exportRows.length === 0) {
+        alert("Nincs letölthető raktári szivattyú adat!");
+        return;
+    }
+
+    if (typeof XLSX === 'undefined') {
+        alert("Hiba: Az Excel (SheetJS) könyvtár nincs betöltve!");
+        return;
+    }
+
+    const dataForSheet = [
+        ["Település", "Utca", "Állapot", "Szivattyú", "Fajtája", "Gyári száma", "Típus", "Járókerék száma", "Tulajdonos", "Megjegyzés"]
+    ];
+
+    exportRows.forEach(item => {
+        dataForSheet.push([
+            item.town,
+            item.street,
+            item.status,
+            item.pumpNum,
+            item.type,
+            item.serial,
+            item.model,
+            item.impeller,
+            item.owner,
+            item.note
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
+    ws['!cols'] = [
+        { wch: 20 }, { wch: 30 }, { wch: 12 }, { wch: 18 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 16 }, { wch: 20 }, { wch: 30 }
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Szivattyú Raktár");
+
+    const dateStr = new Date().toISOString().slice(0, 10);
+    XLSX.writeFile(wb, `Szivattyu_raktar_${dateStr}.xlsx`);
 }
 
 function normalizeStreetName(str) {
@@ -2310,9 +3101,7 @@ function updateAddCleanStreetDropdown() {
     const streetSelect = document.getElementById('addCleanStreet');
     if (!streetSelect) return;
     streetSelect.innerHTML = '';
-    const defaultStreets = streetMapData[settlement] || ["1. sz. Helyszín", "2. sz. Helyszín"];
-    const customFromClean = cleaningRecords.filter(r => (r.settlementName || '').trim().toLowerCase() === settlement.trim().toLowerCase()).map(r => r.streetName);
-    const allStreets = [...defaultStreets, ...customFromClean].filter(Boolean).filter((v, i, a) => a.findIndex(t => t.toLowerCase() === v.toLowerCase()) === i);
+    const allStreets = streetMapData[settlement] || ["1. sz. Helyszín", "2. sz. Helyszín"];
 
     allStreets.forEach(st => {
         const opt = document.createElement('option');
