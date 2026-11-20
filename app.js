@@ -93,11 +93,12 @@ function checkWebSession() {
 }
 
 function normalizeNameToEmailPrefixWeb(name) {
-    if (name.includes('@')) return name.toLowerCase().trim();
-    const unaccented = name.toLowerCase()
-        .replace(/á/g, "a").replace(/é/g, "e").replace(/í/g, "i")
-        .replace(/ó/g, "o").replace(/ö/g, "o").replace(/ő/g, "o")
-        .replace(/ú/g, "u").replace(/ü/g, "u").replace(/ű/g, "u");
+    if (!name) return "";
+    let clean = name.trim().toLowerCase();
+    if (clean.includes('@')) return clean;
+    const unaccented = clean
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "");
     return unaccented.replace(/[^a-z0-9]/g, "");
 }
 
@@ -126,29 +127,48 @@ function handleWebLogin(event) {
     }
 
     const auth = firebase.auth();
-    const prefix = normalizeNameToEmailPrefixWeb(rawUser);
+    const prefixNoDot = normalizeNameToEmailPrefixWeb(rawUser);
+    const prefixWithDot = rawUser.trim().toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, '.');
 
-    const emailCandidate1 = rawUser.includes('@') ? rawUser : `${prefix}@bviz.admin`;
-    const emailCandidate2 = rawUser.includes('@') ? rawUser : `${rawUser.toLowerCase().replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, '.')}@bviz.admin`;
-    const emailCandidate3 = rawUser.includes('@') ? rawUser : `${prefix}@bviz.local`;
+    const candidates = rawUser.includes('@') ? [rawUser] : Array.from(new Set([
+        `${prefixNoDot}@bviz.admin`,
+        `${prefixWithDot}@bviz.admin`,
+        `${prefixNoDot}@bviz.local`,
+        `${prefixWithDot}@bviz.local`
+    ]));
 
-    auth.signInWithEmailAndPassword(emailCandidate1, passInput)
-        .then(() => { if (loginError) loginError.style.display = 'none'; })
-        .catch(() => {
-            auth.signInWithEmailAndPassword(emailCandidate2, passInput)
-                .then(() => { if (loginError) loginError.style.display = 'none'; })
-                .catch(() => {
-                    auth.signInWithEmailAndPassword(emailCandidate3, passInput)
-                        .then(() => { if (loginError) loginError.style.display = 'none'; })
-                        .catch((error) => {
-                            console.error("Belépési hiba:", error.code, error.message);
-                            if (loginError) {
-                                loginError.innerText = 'Hibás felhasználónév vagy jelszó!';
-                                loginError.style.display = 'block';
-                            }
-                        });
-                });
-        });
+    console.log("=== BEJELENTKEZÉSI PRÓBÁLKOZÁS ===");
+    console.log("Felhasználó bemenet:", `"${rawUser}"`);
+    console.log("Tesztelt e-mail kandidátusok:", candidates);
+
+    function tryNextCandidate(index) {
+        if (index >= candidates.length) {
+            console.error("❌ Minden e-mail kandidátussal meghiúsult a bejelentkezés.");
+            if (loginError) {
+                loginError.innerText = 'Hibás felhasználónév vagy jelszó!';
+                loginError.style.display = 'block';
+            }
+            return;
+        }
+
+        const currentEmail = candidates[index];
+        console.log(`[${index + 1}/${candidates.length}] Próbálkozás e-maillel: "${currentEmail}"`);
+
+        auth.signInWithEmailAndPassword(currentEmail, passInput)
+            .then((userCredential) => {
+                console.log("✔ Sikeres Firebase Auth belépés!", userCredential.user?.email);
+                if (loginError) loginError.style.display = 'none';
+            })
+            .catch((error) => {
+                console.warn(`⚠️ Hiba a(z) "${currentEmail}" fiókkal: [${error.code}] ${error.message}`);
+                tryNextCandidate(index + 1);
+            });
+    }
+
+    tryNextCandidate(0);
 }
 
 const WEB_VERSION = "1.5";
