@@ -61,17 +61,25 @@ const streetMapData = {
     "Kunpeszér": ["Bajcsy-Zsilinszky utca", "Béke utca", "Kossuth utca", "Szennyvíztisztító telep", "Víztorony"]
 };
 
-// Biztosítja, hogy a streetMapData mindig tartalmazza az összes törzs-települést és -utcát
+// Törölt átemelők tiltólistája (memória + Firestore perzisztencia)
+const deletedStreetsBlacklist = new Set();
+
+// Biztosítja, hogy a streetMapData mindig tartalmazza az összes törzs-települést és -utcát (kivéve a törölt átemelőket)
 function ensureStreetMapDataIntegrity() {
     try {
         if (!streetMapData || typeof streetMapData !== 'object') return;
         Object.keys(DEFAULT_STREET_MAP_DATA).forEach(t => {
+            const normTown = normalizeStreetName(t);
             if (!streetMapData[t] || !Array.isArray(streetMapData[t])) {
-                streetMapData[t] = [...DEFAULT_STREET_MAP_DATA[t]];
+                streetMapData[t] = DEFAULT_STREET_MAP_DATA[t].filter(s => !deletedStreetsBlacklist.has(`${normTown}_${normalizeStreetName(s)}`));
             } else {
                 DEFAULT_STREET_MAP_DATA[t].forEach(s => {
-                    if (!streetMapData[t].some(existing => normalizeStreetName(existing) === normalizeStreetName(s))) {
-                        streetMapData[t].push(s);
+                    const normStreet = normalizeStreetName(s);
+                    const key = `${normTown}_${normStreet}`;
+                    if (!deletedStreetsBlacklist.has(key)) {
+                        if (!streetMapData[t].some(existing => normalizeStreetName(existing) === normStreet)) {
+                            streetMapData[t].push(s);
+                        }
                     }
                 });
             }
@@ -1363,7 +1371,7 @@ function renderCleaningTable() {
                 <td>${loc.latestRecord.note || '-'}</td>
                 <td style="white-space: nowrap;"><strong style="color: #0077b6;">${loc.latestRecord.userName || 'Mizsei Márk'}</strong></td>
                 <td style="text-align: center; white-space: nowrap; padding: 8px 4px;">
-                    <button onclick="openLocationCleaningHistoryModal('${loc.key}', '${escapedTown}', '${escapedStreet}')" class="btn-history-pill" title="Előzmények megtekintése">
+                    <button onclick="openLocationCleaningHistoryModal('${loc.key}', '${escapedTown}', '${escapedStreet}')" class="btn-history-pill" style="min-width: 115px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center;" title="Előzmények megtekintése">
                         📝 ${loc.historyRecords.length} előzmény
                     </button>
                 </td>
@@ -1915,17 +1923,60 @@ function exportCleaningToExcel() {
     document.body.removeChild(link);
 }
 
+let selectedElectricityStatusValue = 'ALL';
 let selectedPumpStatusValue = 'ALL';
 let selectedPumpWarehouseStatusValue = 'ALL';
 let selectedCleaningStatusValue = 'ALL';
+
+function toggleElectricityStatusDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('electricityCustomStatusMenu');
+    const pumpMenu = document.getElementById('pumpCustomStatusMenu');
+    const whMenu = document.getElementById('pumpWhCustomStatusMenu');
+    const cleanMenu = document.getElementById('cleaningCustomStatusMenu');
+    if (pumpMenu) pumpMenu.style.display = 'none';
+    if (whMenu) whMenu.style.display = 'none';
+    if (cleanMenu) cleanMenu.style.display = 'none';
+
+    if (menu) {
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
+}
+
+function selectElectricityStatusOption(val) {
+    selectedElectricityStatusValue = val;
+    const sel = document.getElementById('electricityStatusFilter');
+    if (sel) sel.value = val;
+    const selectedSpan = document.getElementById('electricityCustomStatusSelected');
+    const menu = document.getElementById('electricityCustomStatusMenu');
+
+    if (selectedSpan) {
+        if (val === 'UP') {
+            selectedSpan.innerHTML = '<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">▲ Növekvő</span>';
+        } else if (val === 'DOWN') {
+            selectedSpan.innerHTML = '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">▼ Csökkenő</span>';
+        } else if (val === 'NONE') {
+            selectedSpan.innerHTML = '<span style="background: #475569; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">— Változatlan</span>';
+        } else {
+            selectedSpan.innerHTML = '<span style="font-size: 13px; font-weight: 600;">Minden állapot</span>';
+        }
+    }
+
+    if (menu) menu.style.display = 'none';
+
+    currentElectricityPage = 1;
+    renderTable();
+}
 
 function toggleCleaningStatusDropdown(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('cleaningCustomStatusMenu');
     const pumpMenu = document.getElementById('pumpCustomStatusMenu');
     const whMenu = document.getElementById('pumpWhCustomStatusMenu');
+    const elecMenu = document.getElementById('electricityCustomStatusMenu');
     if (pumpMenu) pumpMenu.style.display = 'none';
     if (whMenu) whMenu.style.display = 'none';
+    if (elecMenu) elecMenu.style.display = 'none';
 
     if (menu) {
         menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
@@ -1960,8 +2011,10 @@ function togglePumpStatusDropdown(e) {
     const menu = document.getElementById('pumpCustomStatusMenu');
     const whMenu = document.getElementById('pumpWhCustomStatusMenu');
     const cleanMenu = document.getElementById('cleaningCustomStatusMenu');
+    const elecMenu = document.getElementById('electricityCustomStatusMenu');
     if (whMenu) whMenu.style.display = 'none';
     if (cleanMenu) cleanMenu.style.display = 'none';
+    if (elecMenu) elecMenu.style.display = 'none';
     if (menu) {
         menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
     }
@@ -1995,8 +2048,10 @@ function togglePumpWhStatusDropdown(e) {
     const menu = document.getElementById('pumpWhCustomStatusMenu');
     const pumpMenu = document.getElementById('pumpCustomStatusMenu');
     const cleanMenu = document.getElementById('cleaningCustomStatusMenu');
+    const elecMenu = document.getElementById('electricityCustomStatusMenu');
     if (pumpMenu) pumpMenu.style.display = 'none';
     if (cleanMenu) cleanMenu.style.display = 'none';
+    if (elecMenu) elecMenu.style.display = 'none';
     if (menu) {
         menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
     }
@@ -2024,6 +2079,12 @@ function selectPumpWhStatusOption(val) {
 }
 
 document.addEventListener('click', function(e) {
+    const elecDropdown = document.getElementById('electricityCustomStatusDropdown');
+    const elecMenu = document.getElementById('electricityCustomStatusMenu');
+    if (elecDropdown && elecMenu && !elecDropdown.contains(e.target)) {
+        elecMenu.style.display = 'none';
+    }
+
     const pumpDropdown = document.getElementById('pumpCustomStatusDropdown');
     const pumpMenu = document.getElementById('pumpCustomStatusMenu');
     if (pumpDropdown && pumpMenu && !pumpDropdown.contains(e.target)) {
@@ -2282,6 +2343,44 @@ function initDashboard() {
         try {
             const db = firebase.firestore();
 
+            // Törölt átemelők élő szinkronizálása
+            db.collection("deleted_streets").onSnapshot((snapshot) => {
+                let changed = false;
+                snapshot.forEach((doc) => {
+                    const data = doc.data() || {};
+                    const town = String(data.settlementName || '').trim();
+                    const street = String(data.streetName || '').trim();
+                    if (town && street) {
+                        const normTown = normalizeStreetName(town);
+                        const normStreet = normalizeStreetName(street);
+                        const key = `${normTown}_${normStreet}`;
+                        if (!deletedStreetsBlacklist.has(key)) {
+                            deletedStreetsBlacklist.add(key);
+                            changed = true;
+                        }
+                        if (streetMapData[town]) {
+                            streetMapData[town] = streetMapData[town].filter(s => normalizeStreetName(s) !== normStreet);
+                        }
+                        if (DEFAULT_STREET_MAP_DATA[town]) {
+                            DEFAULT_STREET_MAP_DATA[town] = DEFAULT_STREET_MAP_DATA[town].filter(s => normalizeStreetName(s) !== normStreet);
+                        }
+                    }
+                });
+                if (changed) {
+                    updateAddElecStreetDropdown();
+                    updateAddCleanStreetDropdown();
+                    updateAddPumpStreetDropdown();
+                    updateDeleteCustomStreetDropdown();
+                    renderTable();
+                    updateMonthlyProgressSummaryWeb();
+                    renderCleaningTable();
+                    renderPumpTable();
+                    renderPumpWarehouseTable();
+                }
+            }, (error) => {
+                console.warn("Firestore deleted_streets snapshot error:", error);
+            });
+
             db.collection("electricity_readings").onSnapshot((snapshot) => {
                 const list = [];
                 snapshot.forEach((doc) => {
@@ -2292,9 +2391,12 @@ function initDashboard() {
                     const meter = String(data.meterName || data.streetName || data.utca || "Helyszín").trim();
 
                     if (settlement && meter && settlement !== "Apaj" && meter !== "Helyszín") {
-                        if (!streetMapData[settlement]) streetMapData[settlement] = [];
-                        if (!streetMapData[settlement].some(s => normalizeStreetName(s) === normalizeStreetName(meter))) {
-                            streetMapData[settlement].push(meter);
+                        const key = `${normalizeStreetName(settlement)}_${normalizeStreetName(meter)}`;
+                        if (!deletedStreetsBlacklist.has(key)) {
+                            if (!streetMapData[settlement]) streetMapData[settlement] = [];
+                            if (!streetMapData[settlement].some(s => normalizeStreetName(s) === normalizeStreetName(meter))) {
+                                streetMapData[settlement].push(meter);
+                            }
                         }
                     }
 
@@ -2323,14 +2425,16 @@ function initDashboard() {
                 snapshot.forEach((doc) => {
                     const data = doc.data() || {};
                     if (data.settlementName && Array.isArray(data.streetsOrder)) {
-                        const existingList = streetMapData[data.settlementName] || (DEFAULT_STREET_MAP_DATA[data.settlementName] ? [...DEFAULT_STREET_MAP_DATA[data.settlementName]] : []);
-                        const mergedOrder = [...data.streetsOrder];
+                        const sTown = data.settlementName;
+                        const validCustomOrder = data.streetsOrder.filter(st => !deletedStreetsBlacklist.has(`${normalizeStreetName(sTown)}_${normalizeStreetName(st)}`));
+                        const existingList = (streetMapData[sTown] || (DEFAULT_STREET_MAP_DATA[sTown] ? [...DEFAULT_STREET_MAP_DATA[sTown]] : [])).filter(st => !deletedStreetsBlacklist.has(`${normalizeStreetName(sTown)}_${normalizeStreetName(st)}`));
+                        const mergedOrder = [...validCustomOrder];
                         existingList.forEach(st => {
                             if (!mergedOrder.some(s => normalizeStreetName(s) === normalizeStreetName(st))) {
                                 mergedOrder.push(st);
                             }
                         });
-                        streetMapData[data.settlementName] = mergedOrder;
+                        streetMapData[sTown] = mergedOrder.filter(st => !deletedStreetsBlacklist.has(`${normalizeStreetName(sTown)}_${normalizeStreetName(st)}`));
                     }
                 });
                 ensureStreetMapDataIntegrity();
@@ -2345,11 +2449,14 @@ function initDashboard() {
                     const town = String(data.settlementName || data.telepules || '').trim();
                     const street = String(data.streetName || data.utca || '').trim();
                     if (town && street) {
-                        if (!streetMapData[town]) {
-                            streetMapData[town] = [];
-                        }
-                        if (!streetMapData[town].some(s => normalizeStreetName(s) === normalizeStreetName(street))) {
-                            streetMapData[town].push(street);
+                        const key = `${normalizeStreetName(town)}_${normalizeStreetName(street)}`;
+                        if (!deletedStreetsBlacklist.has(key)) {
+                            if (!streetMapData[town]) {
+                                streetMapData[town] = [];
+                            }
+                            if (!streetMapData[town].some(s => normalizeStreetName(s) === normalizeStreetName(street))) {
+                                streetMapData[town].push(street);
+                            }
                         }
                     }
                 });
@@ -3338,7 +3445,7 @@ function updateMonthlyProgressSummaryWeb() {
         if (remainingMeters === 0 && totalMeters > 0) {
             hatralevoContainer.innerHTML = '<span style="background: #15803d; color: #ffffff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">Kész!</span>';
         } else {
-            hatralevoContainer.innerHTML = `Még <span id="hatralevo-count" style="color: #80deea; font-weight: bold;">${remainingMeters}</span> db`;
+            hatralevoContainer.innerHTML = `Még <span id="hatralevo-count" class="count-remaining" style="font-weight: 800;">${remainingMeters}</span> db`;
         }
 
         if (progressBar) {
@@ -3354,7 +3461,7 @@ function renderTable() {
         ensureStreetMapDataIntegrity();
         const tbody = document.getElementById('readingsTableBody');
         const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
-        const statusFilter = document.getElementById('electricityStatusFilter') ? document.getElementById('electricityStatusFilter').value : 'ALL';
+        const statusFilter = selectedElectricityStatusValue || (document.getElementById('electricityStatusFilter') ? document.getElementById('electricityStatusFilter').value : 'ALL');
         const searchQuery = document.getElementById('electricitySearch') ? String(document.getElementById('electricitySearch').value ?? '').trim().toLowerCase() : '';
         const pageSizeVal = document.getElementById('electricityPageSize') ? document.getElementById('electricityPageSize').value : 'ALL';
 
@@ -3384,7 +3491,7 @@ function renderTable() {
                     let currKwhNum = null;
                     let prevKwhText = '—';
                     let currKwhText = '—';
-                    let diffBadge = '<span style="color:#94a3b8; font-weight:500;">—</span>';
+                    let diffBadge = '<span style="color:#94a3b8; font-weight:600;">—</span>';
                     let diffStatus = 'NONE';
                     let dateStr = '2026. 11. 11.';
                     let uploaderName = 'Rendszer';
@@ -3425,17 +3532,17 @@ function renderTable() {
                             const diff = currKwhNum - prevKwhNum;
                             if (diff > 0) {
                                 diffStatus = 'UP';
-                                diffBadge = `<span style="background: #dcfce7; color: #15803d; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block; border: 1px solid #86efac;">▲ +${Math.round(diff)} kWh</span>`;
+                                diffBadge = `<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">▲ +${Math.round(diff)} kWh</span>`;
                             } else if (diff < 0) {
                                 diffStatus = 'DOWN';
-                                diffBadge = `<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block; border: 1px solid #fca5a5;">▼ ${Math.round(diff)} kWh</span>`;
+                                diffBadge = `<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; box-shadow: 0 2px 4px rgba(0,0,0,0.15);">▼ ${Math.round(diff)} kWh</span>`;
                             } else {
                                 diffStatus = 'NONE';
-                                diffBadge = `<span style="background: #f1f5f9; color: #475569; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block; border: 1px solid #cbd5e1;">0 kWh</span>`;
+                                diffBadge = `<span style="background: #475569; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">0 kWh</span>`;
                             }
                         } else {
                             diffStatus = 'NONE';
-                            diffBadge = '<span style="color:#94a3b8; font-weight:500;">—</span>';
+                            diffBadge = '<span style="color:#94a3b8; font-weight:600;">—</span>';
                         }
                     }
 
@@ -3580,7 +3687,7 @@ function renderTable() {
                     <td style="color: #334155; font-size: 13px; font-weight: 500;">${String(item.note ?? '—')}</td>
                     <td style="white-space: nowrap;"><strong style="color: #0077b6;">${String(item.userName ?? 'Rendszer')}</strong></td>
                     <td style="text-align: center; white-space: nowrap; padding: 8px 4px;">
-                        <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-history-pill" title="Előzmények megtekintése">
+                        <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-history-pill" style="min-width: 115px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center;" title="Előzmények megtekintése">
                             📄 ${item.historyCount} előzmény
                         </button>
                     </td>
@@ -3837,7 +3944,14 @@ function applySavedColumnConfigToTable(key) {
     if (Array.isArray(config.widths) && config.widths.length === currentThs.length) {
         currentThs.forEach((th, i) => {
             if (config.widths[i]) {
-                th.style.width = config.widths[i] + 'px';
+                let w = parseInt(config.widths[i], 10);
+                if (th.textContent && th.textContent.includes('Műveletek') && (!Number.isFinite(w) || w < 135)) {
+                    w = 135;
+                }
+                th.style.width = w + 'px';
+                if (th.textContent && th.textContent.includes('Műveletek')) {
+                    th.style.minWidth = '135px';
+                }
             }
         });
     }
@@ -4086,8 +4200,8 @@ function promptPasswordConfirmation({ title, message, onConfirm }) {
             </p>
 
             <div style="margin-bottom: 16px; text-align: left;">
-                <label style="display: block; font-size: 12px; font-weight: bold; color: #94a3b8; margin-bottom: 6px;">Jelszó megadása:</label>
-                <input type="password" id="confirmDeletePasswordInput" placeholder="Add meg a fiókod jelszavát..." style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #334155; font-size: 14px; color: #ffffff; background: #1e293b; outline: none; box-sizing: border-box;" autocomplete="current-password">
+                <label style="display: block; font-size: 12px; font-weight: bold; color: #94a3b8; margin-bottom: 6px;">Jelszó vagy biztonsági kód:</label>
+                <input type="password" id="confirmDeletePasswordInput" placeholder="Add meg a belépési jelszót vagy letöltési kódot..." style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #334155; font-size: 14px; color: #ffffff; background: #1e293b; outline: none; box-sizing: border-box;" autocomplete="current-password">
             </div>
 
             <div id="confirmDeleteError" style="color: #fca5a5; font-size: 13px; font-weight: bold; margin-bottom: 16px; display: none; background: rgba(239, 68, 68, 0.2); padding: 8px 12px; border-radius: 8px; border: 1px solid #ef4444;"></div>
@@ -4131,7 +4245,7 @@ function promptPasswordConfirmation({ title, message, onConfirm }) {
         const password = passInput ? passInput.value.trim() : '';
         if (!password) {
             if (errorDiv) {
-                errorDiv.innerText = 'Kérjük adja meg a jelszót!';
+                errorDiv.innerText = 'Kérjük adja meg a jelszót vagy kódot!';
                 errorDiv.style.display = 'block';
             }
             return;
@@ -4141,21 +4255,43 @@ function promptPasswordConfirmation({ title, message, onConfirm }) {
         submitBtn.innerText = 'Ellenőrzés...';
 
         try {
-            if (typeof firebase !== 'undefined' && firebase.auth) {
-                const auth = firebase.auth();
-                const user = auth.currentUser;
+            let authOk = false;
+            if (typeof firebase !== 'undefined') {
+                const auth = firebase.auth ? firebase.auth() : null;
+                const user = auth ? auth.currentUser : null;
 
+                // 1. Megpróbáljuk a belépett fiók jelszavával
                 if (user && user.email) {
-                    const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
-                    await user.reauthenticateWithCredential(credential);
-                } else {
+                    try {
+                        const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+                        await user.reauthenticateWithCredential(credential);
+                        authOk = true;
+                    } catch (e1) {
+                        // Nem a fiók jelszava volt
+                    }
+                } else if (auth) {
                     const loggedInEmail = getLoggedInAdminEmail();
                     if (loggedInEmail) {
-                        await auth.signInWithEmailAndPassword(loggedInEmail, password);
-                    } else {
-                        throw new Error("Nincs bejelentkezett felhasználó");
+                        try {
+                            await auth.signInWithEmailAndPassword(loggedInEmail, password);
+                            authOk = true;
+                        } catch (e2) {}
                     }
                 }
+
+                // 2. Ha az nem sikerült, ellenőrizzük az app_downloads kollekcióban lévő érvényes letöltési kóddal
+                if (!authOk && firebase.firestore) {
+                    try {
+                        const codeSnap = await firebase.firestore().collection('app_downloads').doc(password).get();
+                        if (codeSnap.exists) {
+                            authOk = true;
+                        }
+                    } catch (e3) {}
+                }
+            }
+
+            if (!authOk) {
+                throw new Error("Hibás jelszó vagy biztonsági kód!");
             }
 
             closeSelf();
@@ -4163,13 +4299,13 @@ function promptPasswordConfirmation({ title, message, onConfirm }) {
                 onConfirm();
             }
         } catch (err) {
-            console.warn("🔒 Password re-authentication failed:", err);
+            console.warn("🔒 Password / code verification failed:", err);
             if (submitBtn) {
                 submitBtn.disabled = false;
                 submitBtn.innerText = 'Végleges törlés';
             }
             if (errorDiv) {
-                errorDiv.innerText = 'Hibás jelszó! A törlés megszakítva.';
+                errorDiv.innerText = 'Hibás jelszó vagy biztonsági kód! A művelet megszakítva.';
                 errorDiv.style.display = 'block';
             }
         }
@@ -4209,28 +4345,99 @@ function executeDeleteCustomStreetFromWeb() {
 }
 
 function performDeleteCustomStreetExecution(town, street) {
+    if (!town || !street) return;
+
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
+    const blacklistKey = `${normTown}_${normStreet}`;
+
+    // 1. Azonnal bekerül a feketelistába (így sem az önvédelmi ellenőrzés, sem a snapshotok nem állítják vissza)
+    deletedStreetsBlacklist.add(blacklistKey);
+
+    // 2. Törlés a helyi memóriából
     if (streetMapData[town]) {
-        streetMapData[town] = streetMapData[town].filter(s => s.toLowerCase() !== street.toLowerCase());
+        streetMapData[town] = streetMapData[town].filter(s => normalizeStreetName(s) !== normStreet);
+    }
+    // 3. Törlés a DEFAULT törzslistából is, hogy az ensureStreetMapDataIntegrity ne tudja visszatenni
+    if (DEFAULT_STREET_MAP_DATA[town]) {
+        DEFAULT_STREET_MAP_DATA[town] = DEFAULT_STREET_MAP_DATA[town].filter(s => normalizeStreetName(s) !== normStreet);
     }
 
-    electricityReadings = electricityReadings.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.meterName || '').toLowerCase() === street.toLowerCase() ));
-    cleaningRecords = cleaningRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
-    pumpRecords = pumpRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
-    pumpWarehouseRecords = pumpWarehouseRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
+    // 4. Helyi adatlisták kitisztítása
+    electricityReadings = (electricityReadings || []).filter(r => !(normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.meterName) === normStreet));
+    cleaningRecords = (cleaningRecords || []).filter(r => !(normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.streetName) === normStreet));
+    pumpRecords = (pumpRecords || []).filter(r => !(normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.streetName) === normStreet));
+    pumpWarehouseRecords = (pumpWarehouseRecords || []).filter(r => !(normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.streetName) === normStreet));
 
+    // 5. Firestore végleges törlés minden kollekcióból
     const docId = `${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-    if (typeof firebase !== 'undefined') {
+    const fixedElecId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
         try {
             const db = firebase.firestore();
-            db.collection("custom_streets").doc(docId).delete();
-            db.collection("pump_records").doc(docId).delete();
-            db.collection("pump_warehouse").doc(docId).delete();
-            db.collection("electricity_readings").where("settlementName", "==", town).where("meterName", "==", street).get().then(snapshot => {
-                snapshot.forEach(doc => doc.ref.delete());
-            });
-            db.collection("cleaning_records").where("settlementName", "==", town).where("streetName", "==", street).get().then(snapshot => {
-                snapshot.forEach(doc => doc.ref.delete());
-            });
+
+            // Végleges jelölő a deleted_streets gyűjteménybe
+            db.collection("deleted_streets").doc(blacklistKey).set({
+                settlementName: town,
+                streetName: street,
+                timestamp: Date.now()
+            }, { merge: true }).catch(() => {});
+
+            // Törlés a custom_streets kollekcióból
+            db.collection("custom_streets").doc(docId).delete().catch(() => {});
+            db.collection("custom_streets").where("settlementName", "==", town).get().then(snap => {
+                snap.forEach(d => {
+                    const s = d.data().streetName || d.data().utca;
+                    if (normalizeStreetName(s) === normStreet) d.ref.delete().catch(() => {});
+                });
+            }).catch(() => {});
+
+            // Törlés a custom_street_order sorrendből
+            db.collection("custom_street_order").doc(town).get().then(docSnap => {
+                if (docSnap.exists) {
+                    const data = docSnap.data() || {};
+                    if (Array.isArray(data.streetsOrder)) {
+                        const newOrder = data.streetsOrder.filter(s => normalizeStreetName(s) !== normStreet);
+                        db.collection("custom_street_order").doc(town).update({
+                            streetsOrder: newOrder
+                        }).catch(() => {});
+                    }
+                }
+            }).catch(() => {});
+
+            // Törlés az electricity_readings kollekcióból
+            db.collection("electricity_readings").doc(fixedElecId).delete().catch(() => {});
+            db.collection("electricity_readings").where("settlementName", "==", town).get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const m = doc.data().meterName || doc.data().streetName || doc.data().utca;
+                    if (normalizeStreetName(m) === normStreet) doc.ref.delete().catch(() => {});
+                });
+            }).catch(() => {});
+
+            // Törlés a cleaning_records kollekcióból
+            db.collection("cleaning_records").where("settlementName", "==", town).get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const s = doc.data().streetName || doc.data().utca;
+                    if (normalizeStreetName(s) === normStreet) doc.ref.delete().catch(() => {});
+                });
+            }).catch(() => {});
+
+            // Törlés a pump_records és pump_warehouse kollekciókból
+            db.collection("pump_records").doc(docId).delete().catch(() => {});
+            db.collection("pump_warehouse").doc(docId).delete().catch(() => {});
+            db.collection("pump_records").where("settlementName", "==", town).get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const s = doc.data().streetName || doc.data().utca;
+                    if (normalizeStreetName(s) === normStreet) doc.ref.delete().catch(() => {});
+                });
+            }).catch(() => {});
+            db.collection("pump_warehouse").where("settlementName", "==", town).get().then(snapshot => {
+                snapshot.forEach(doc => {
+                    const s = doc.data().streetName || doc.data().utca;
+                    if (normalizeStreetName(s) === normStreet) doc.ref.delete().catch(() => {});
+                });
+            }).catch(() => {});
         } catch (e) {
             console.error("Firebase delete error:", e);
         }
@@ -4241,6 +4448,7 @@ function performDeleteCustomStreetExecution(town, street) {
     updateAddPumpStreetDropdown();
     updateDeleteCustomStreetDropdown();
     renderTable();
+    updateMonthlyProgressSummaryWeb();
     renderCleaningTable();
     renderPumpTable();
     renderPumpWarehouseTable();
@@ -4276,14 +4484,20 @@ function saveCustomStreetFromWeb() {
         return;
     }
 
+    const normTown = normalizeStreetName(settlement);
+    const normStreet = normalizeStreetName(streetName);
+    const blacklistKey = `${normTown}_${normStreet}`;
+    deletedStreetsBlacklist.delete(blacklistKey);
+
     if (!streetMapData[settlement]) {
         streetMapData[settlement] = [];
     }
-    if (!streetMapData[settlement].includes(streetName)) {
+    if (!streetMapData[settlement].some(s => normalizeStreetName(s) === normStreet)) {
         streetMapData[settlement].push(streetName);
     }
 
     const docId = `${settlement}_${streetName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    const fixedElecId = `elec_${settlement}_${streetName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
     const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
 
     const customStreetPayload = {
@@ -4308,6 +4522,19 @@ function saveCustomStreetFromWeb() {
         timestamp: Date.now()
     };
 
+    const elecPayload = {
+        id: fixedElecId,
+        settlementName: settlement,
+        meterName: streetName,
+        dateString: dateStr,
+        timestamp: Date.now(),
+        dayKwh: null,
+        prevDayKwh: null,
+        userEmail: getLoggedInAdminEmail(),
+        userName: getLoggedInAdminName(),
+        note: ""
+    };
+
     const idxP = pumpRecords.findIndex(r => r.id === docId);
     if (idxP >= 0) {
         pumpRecords[idxP] = pumpPayload;
@@ -4315,11 +4542,29 @@ function saveCustomStreetFromWeb() {
         pumpRecords.unshift(pumpPayload);
     }
 
-    if (typeof firebase !== 'undefined') {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
         try {
             const db = firebase.firestore();
-            db.collection("custom_streets").doc(docId).set(customStreetPayload, { merge: true });
-            db.collection("pump_records").doc(docId).set(pumpPayload, { merge: true });
+            db.collection("deleted_streets").doc(blacklistKey).delete().catch(() => {});
+            db.collection("custom_streets").doc(docId).set(customStreetPayload, { merge: true }).catch(() => {});
+            db.collection("pump_records").doc(docId).set(pumpPayload, { merge: true }).catch(() => {});
+            db.collection("electricity_readings").doc(fixedElecId).set(elecPayload, { merge: true }).catch(() => {});
+
+            db.collection("custom_street_order").doc(settlement).get().then(docSnap => {
+                let order = [];
+                if (docSnap.exists && Array.isArray(docSnap.data().streetsOrder)) {
+                    order = [...docSnap.data().streetsOrder];
+                } else {
+                    order = streetMapData[settlement] ? [...streetMapData[settlement]] : [];
+                }
+                if (!order.some(s => normalizeStreetName(s) === normStreet)) {
+                    order.push(streetName);
+                }
+                db.collection("custom_street_order").doc(settlement).set({
+                    settlementName: settlement,
+                    streetsOrder: order
+                }, { merge: true }).catch(() => {});
+            }).catch(() => {});
         } catch (e) {
             console.error("Firebase custom street save error:", e);
         }
@@ -4328,7 +4573,9 @@ function saveCustomStreetFromWeb() {
     updateAddElecStreetDropdown();
     updateAddCleanStreetDropdown();
     updateAddPumpStreetDropdown();
+    updateDeleteCustomStreetDropdown();
     renderTable();
+    updateMonthlyProgressSummaryWeb();
     renderCleaningTable();
     renderPumpTable();
 
