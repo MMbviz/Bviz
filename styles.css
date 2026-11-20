@@ -83,18 +83,22 @@ body.dark-theme textarea:focus {
 .btn-green-dark {
     background: linear-gradient(135deg, #1b5e20, #0d3b13);
     color: white;
-    padding: 10px 18px;
+    padding: 0 16px;
+    height: 38px;
+    box-sizing: border-box;
     border-radius: 8px;
     font-weight: bold;
     text-decoration: none;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
     box-shadow: 0 3px 8px rgba(0,0,0,0.25);
-    font-size: 13px;
+    font-size: 14px;
     border: 1px solid rgba(255,255,255,0.2);
     cursor: pointer;
     transition: all 0.2s ease-in-out;
+    white-space: nowrap;
 }
 
 .btn-green-dark:hover {
@@ -517,24 +521,86 @@ body.dark-theme .custom-dropdown-option:hover {
 }
 
 /* Amber Rollover Button */
-#webRolloverBtn {
-    background: #f59e0b !important;
-    color: #0f172a !important;
-    border: none;
-    padding: 10px 18px;
+/* Top Action Buttons (Unified Styling) */
+.top-action-btn {
+    height: 40px;
+    box-sizing: border-box;
     border-radius: 8px;
-    font-weight: bold;
+    font-family: inherit;
     font-size: 14px;
-    cursor: pointer;
-    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    font-weight: bold;
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 6px;
-    transition: background 0.2s ease;
+    padding: 0 18px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.top-action-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}
+
+.btn-action-amber {
+    background: #f59e0b !important;
+    color: #0f172a !important;
+}
+.btn-action-amber:hover {
+    background: #d97706 !important;
+}
+
+.btn-action-green {
+    background: #1b5e20 !important;
+    color: #ffffff !important;
+}
+.btn-action-green:hover {
+    background: #144918 !important;
+}
+
+.btn-action-blue {
+    background: #0077b6 !important;
+    color: #ffffff !important;
+}
+.btn-action-blue:hover {
+    background: #0284c7 !important;
+}
+
+.btn-action-red {
+    background: #e53935 !important;
+    color: #ffffff !important;
+}
+.btn-action-red:hover {
+    background: #c62828 !important;
+}
+
+#webRolloverBtn {
+    height: 40px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 18px;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    background: #f59e0b !important;
+    color: #0f172a !important;
+    transition: all 0.2s ease;
 }
 
 #webRolloverBtn:hover {
     background: #d97706 !important;
+    transform: translateY(-1px);
 }
 
 /* Compact Monthly Progress Pill Badge */
@@ -543,13 +609,13 @@ body.dark-theme .custom-dropdown-option:hover {
     background: #ffffff;
     color: #0f172a;
     border: 1px solid #bbf7d0;
-    border-radius: 12px;
+    border-radius: 10px;
     box-shadow: 0 2px 6px rgba(15, 23, 42, 0.06);
     display: inline-flex;
     flex-direction: column;
     justify-content: space-between;
-    min-width: 230px;
-    height: 40px;
+    min-width: 220px;
+    height: 38px !important;
     box-sizing: border-box;
     overflow: hidden;
     user-select: none;
@@ -624,7 +690,21 @@ body.dark-theme .havi-osszesito-badge .progress-bar-inner {
 }
 
 #webPrimaryActionButton {
-    margin-left: auto !important;
+    height: 40px;
+    box-sizing: border-box;
+    border-radius: 8px;
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: bold;
+    border: none;
+    cursor: pointer;
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    padding: 0 18px;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.2s ease;
 }
 
 /* ====================================================
@@ -1039,8 +1119,10 @@ body.dark-theme .pump-note-box {
     color: #ffffff !important;
 }
 
-body.dark-theme .pump-card-title {
-    color: #F1F5F9 !important;
+body.dark-theme .pump-card-title,
+body.dark-theme .wh-card-title {
+    color: #f8fafc !important;
+    font-weight: 700 !important;
 }
 
 body.dark-theme #pumpVisualContainer input,
@@ -1106,4 +1188,372 @@ body.dark-theme .about-info-val {
 
 body.dark-theme .about-info-link {
     color: #38bdf8 !important;
+}
+
+/* Custom CSS Tooltip Styling for Buttons */
+.custom-tooltip-btn {
+    position: relative;
+}
+
+.custom-tooltip-btn[data-tooltip]::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%) translateY(8px);
+    background: #0f172a;
+    color: #f8fafc;
+    border: 1px solid #38bdf8;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.4;
+    text-align: center;
+    white-space: normal;
+    width: 250px;
+    max-width: 80vw;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.6);
+    z-index: 99999;
+    pointer-events: none;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.15s ease, visibility 0.15s ease, transform 0.15s ease;
+}
+
+.custom-tooltip-btn.green-tooltip-btn[data-tooltip]::after {
+    border: 1px solid #10b981;
+}
+
+.custom-tooltip-btn[data-tooltip]:hover::after {
+    opacity: 1;
+    visibility: visible;
+    transform: translateX(-50%) translateY(12px);
+}
+
+/* Unified Settlement Badge Style Across All 4 Tabs */
+.settlement-badge {
+    background: #dcfce7 !important;
+    color: #14532d !important;
+    border: 1px solid #16a34a !important;
+    font-weight: 700 !important;
+    font-size: 13px !important;
+    padding: 4px 10px !important;
+    border-radius: 6px !important;
+    display: inline-block !important;
+    white-space: nowrap !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+}
+
+body.dark-theme .settlement-badge {
+    background: rgba(14, 165, 233, 0.22) !important;
+    color: #e0f2fe !important;
+    border: 1px solid #38bdf8 !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Column Alignment & Resizing Toolbar Buttons */
+.btn-align-start {
+    background: #0f172a;
+    color: #38bdf8;
+    border: 1px solid #0284c7;
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 36px;
+    height: 36px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+}
+
+.btn-align-start:hover {
+    background: #0284c7;
+    color: #ffffff;
+    box-shadow: 0 4px 10px rgba(2, 132, 199, 0.3);
+}
+
+.btn-align-done {
+    background: #0284c7;
+    color: #ffffff;
+    border: 1px solid #38bdf8;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.3);
+}
+
+.btn-align-done:hover {
+    background: #0369a1;
+}
+
+.btn-align-reset {
+    background: #334155;
+    color: #f8fafc;
+    border: 1px solid #64748b;
+    padding: 8px 14px;
+    border-radius: 8px;
+    font-size: 13.5px;
+    font-weight: 700;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.2s;
+}
+
+.btn-align-reset:hover {
+    background: #dc2626;
+    color: #ffffff;
+    border-color: #ef4444;
+}
+
+/* Active Column Alignment Table Overlay Styles */
+.data-table.column-alignment-active {
+    table-layout: fixed !important;
+}
+
+.data-table.column-alignment-active th {
+    position: relative !important;
+    user-select: none !important;
+    cursor: grab !important;
+    border-right: 2px dashed #38bdf8 !important;
+    background: #005580 !important;
+}
+
+.data-table.column-alignment-active th.dragging-col {
+    opacity: 0.5 !important;
+    background: #38bdf8 !important;
+}
+
+.data-table.column-alignment-active th.drag-over-col {
+    border-left: 4px solid #38bdf8 !important;
+}
+
+.col-resize-handle {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 10px;
+    height: 100%;
+    cursor: ew-resize;
+    user-select: none;
+    z-index: 20;
+}
+
+.col-resize-handle:hover,
+.col-resize-handle.resizing {
+    background: #38bdf8;
+    opacity: 0.9;
+}
+
+/* Filter Bar Controls Across All Sections */
+.filter-input {
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 14px;
+    outline: none;
+    height: 38px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.filter-input:focus {
+    background-color: #FFF9E6 !important;
+    border: 2px solid #0284C7 !important;
+}
+
+.filter-select {
+    padding: 0 12px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    font-weight: 600;
+    color: #0f172a;
+    background: #ffffff;
+    font-size: 14px;
+    cursor: pointer;
+    outline: none;
+    height: 38px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.filter-select:hover {
+    border-color: #0077b6;
+}
+
+.filter-label {
+    color: #1e293b;
+    font-weight: 600;
+    font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+/* Cleaning Module View Switcher Toggle (Állapot áttekintő / Teljes előzménynapló) */
+.cleaning-view-toggle {
+    display: inline-flex;
+    background: #f1f5f9;
+    padding: 3px;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    align-items: center;
+    gap: 2px;
+}
+
+.cleaning-toggle-btn {
+    border: none;
+    padding: 6px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: bold;
+    cursor: pointer;
+    background: transparent;
+    color: #64748b;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+
+.cleaning-toggle-btn.active {
+    background: #0077b6;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(0, 119, 182, 0.3);
+}
+
+/* Unified History Pill Button (Villanyórák & Takarítás & egyéb táblázatok) */
+.btn-history-pill {
+    background: #f0f9ff;
+    border: 1px solid #0284c7;
+    color: #0284c7;
+    padding: 0 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+    font-weight: 700;
+    cursor: pointer;
+    white-space: nowrap;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    height: 30px;
+    min-width: 110px;
+    box-sizing: border-box;
+    transition: all 0.2s ease;
+}
+
+.btn-history-pill:hover {
+    background: #0284c7;
+    color: #ffffff;
+    box-shadow: 0 2px 6px rgba(2, 132, 199, 0.35);
+}
+
+/* ====================================================
+   DARK THEME UNIFIED OVERRIDES
+   ==================================================== */
+body.dark-theme .top-action-btn.btn-action-green {
+    background: linear-gradient(135deg, #16a34a, #15803d) !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .top-action-btn.btn-action-blue {
+    background: linear-gradient(135deg, #0077b6, #0284c7) !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .top-action-btn.btn-action-red {
+    background: linear-gradient(135deg, #e53935, #c62828) !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .btn-green-dark {
+    background: linear-gradient(135deg, #16a34a, #15803d) !important;
+    color: #ffffff !important;
+    border-color: rgba(255,255,255,0.2) !important;
+}
+
+body.dark-theme .btn-green-dark:hover {
+    background: #15803d !important;
+}
+
+body.dark-theme .cleaning-view-toggle {
+    background: #040810 !important;
+    border-color: #1a2333 !important;
+}
+
+body.dark-theme .cleaning-toggle-btn {
+    color: #94a3b8 !important;
+}
+
+body.dark-theme .cleaning-toggle-btn.active {
+    background: linear-gradient(135deg, #0077b6, #0284c7) !important;
+    color: #ffffff !important;
+    box-shadow: 0 2px 8px rgba(2, 132, 199, 0.4) !important;
+}
+
+body.dark-theme .btn-history-pill {
+    background: rgba(2, 132, 199, 0.15) !important;
+    border-color: #0284c7 !important;
+    color: #38bdf8 !important;
+}
+
+body.dark-theme .btn-history-pill:hover {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+    border-color: #38bdf8 !important;
+}
+
+body.dark-theme .btn-icon-edit {
+    background: rgba(2, 132, 199, 0.15) !important;
+    border-color: #0284c7 !important;
+    color: #38bdf8 !important;
+}
+
+body.dark-theme .btn-icon-edit:hover {
+    background: #0284c7 !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .btn-icon-delete {
+    background: rgba(239, 68, 68, 0.15) !important;
+    border-color: #ef4444 !important;
+    color: #fca5a5 !important;
+}
+
+body.dark-theme .btn-icon-delete:hover {
+    background: #ef4444 !important;
+    color: #ffffff !important;
+}
+
+body.dark-theme .filter-input,
+body.dark-theme input[type="text"].filter-input {
+    background-color: #040810 !important;
+    color: #ffffff !important;
+    border-color: #0284c7 !important;
+}
+
+body.dark-theme .filter-select,
+body.dark-theme select.filter-select {
+    background-color: #040810 !important;
+    color: #ffffff !important;
+    border-color: #0284c7 !important;
+}
+
+body.dark-theme .filter-label,
+body.dark-theme label.filter-label {
+    color: #ffffff !important;
 }

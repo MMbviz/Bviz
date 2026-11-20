@@ -24,6 +24,31 @@ let currentP1State = 0;
 let currentP2State = 0;
 let webSaveTimeout = null;
 
+// Törzsadatok: eredeti városok és utcák biztonsági másolata
+const DEFAULT_STREET_MAP_DATA = {
+    "Apaj": ["I. számú Dobó I. u.", "II. számú Dobó I. u.", "III. számú Tópart u."],
+    "Kunszentmiklós": ["Balogh J. utca", "Bartók Béla utca", "Erkel Ferenc utca 16.", "Hevesi köz", "Hunyadi utca", "Kálvin tér", "Kossuth Lajos út", "Kun utca", "Nádas utca", "Óvoda utca", "Rákóczi utca", "Szabadság utca", "Szappanos L. utca", "Széchenyi utca"],
+    "Apostag": ["Dunaegyházi út", "Petőfi Sándor utca", "Temető utca", "Víztorony"],
+    "Dunavecse": ["Alkony utca", "Bajcsy-Zsilinszky utca", "Fő út", "Hársfa utca", "Külső Körút", "Liszt Ferenc tér", "Petőfi Sándor utca", "Rákóczi út"],
+    "Szabadszállás": ["Honvéd utca", "Alsótemető sor", "Rákóczi tér", "Dózsa György út", "Gyóni Géza utca", "Kölcsey tér", "Szegfű utca", "Bercsényi utca"],
+    "Kunadacs": ["József Attila utca", "Kossuth utca", "Kossuth utca 1.", "Szennyvíztelep", "Víztorony"],
+    "Szalkszentmárton": ["Alkotmány utca", "Béke utca", "Eperfa utca", "Munkás utca", "Túzok - Zrínyi sarok", "Béke - Arany J. utca", "Tassi út", "Rákóczi - Arany J. utca", "Hősök tere Észak", "Hősök tere Dél", "Bajcsy utca", "József Attila utca", "Kádár utca", "Vasút utca", "Kossuth L. - Bacsó B. utca", "Felszabadulás út"],
+    "Tass": ["Egecsei krt. - Jókai utca", "Móra Ferenc - Cserkész utca", "Egecsei krt.", "Munkácsy - Zrínyi utca", "Kossuth krt. - Rákóczi utca", "Rákóczi - Kertész utca", "Telep utca", "Petőfi Sándor utca", "Bajcsy-Zsilinszky utca", "Mátyás király utca"],
+    "Kunpeszér": ["Bajcsy-Zsilinszky utca", "Béke utca", "Kossuth utca", "Szennyvíztisztító telep", "Víztorony"]
+};
+
+// Biztonságos számkonverzió (üres, null, NaN vagy érvénytelen érték esetén null-t ad vissza)
+function parseKwhValue(val) {
+    if (val === undefined || val === null || val === '') return null;
+    if (typeof val === 'number') {
+        return (isNaN(val) || !Number.isFinite(val)) ? null : val;
+    }
+    const cleanStr = String(val ?? '').trim().replace(/\s+/g, '').replace(',', '.');
+    if (cleanStr === '' || cleanStr === '-' || cleanStr === '—' || cleanStr === 'null' || cleanStr === 'undefined') return null;
+    const num = parseFloat(cleanStr);
+    return (!Number.isFinite(num) || isNaN(num)) ? null : num;
+}
+
 const streetMapData = {
     "Apaj": ["I. számú Dobó I. u.", "II. számú Dobó I. u.", "III. számú Tópart u."],
     "Kunszentmiklós": ["Balogh J. utca", "Bartók Béla utca", "Erkel Ferenc utca 16.", "Hevesi köz", "Hunyadi utca", "Kálvin tér", "Kossuth Lajos út", "Kun utca", "Nádas utca", "Óvoda utca", "Rákóczi utca", "Szabadság utca", "Szappanos L. utca", "Széchenyi utca"],
@@ -35,6 +60,26 @@ const streetMapData = {
     "Tass": ["Egecsei krt. - Jókai utca", "Móra Ferenc - Cserkész utca", "Egecsei krt.", "Munkácsy - Zrínyi utca", "Kossuth krt. - Rákóczi utca", "Rákóczi - Kertész utca", "Telep utca", "Petőfi Sándor utca", "Bajcsy-Zsilinszky utca", "Mátyás király utca"],
     "Kunpeszér": ["Bajcsy-Zsilinszky utca", "Béke utca", "Kossuth utca", "Szennyvíztisztító telep", "Víztorony"]
 };
+
+// Biztosítja, hogy a streetMapData mindig tartalmazza az összes törzs-települést és -utcát
+function ensureStreetMapDataIntegrity() {
+    try {
+        if (!streetMapData || typeof streetMapData !== 'object') return;
+        Object.keys(DEFAULT_STREET_MAP_DATA).forEach(t => {
+            if (!streetMapData[t] || !Array.isArray(streetMapData[t])) {
+                streetMapData[t] = [...DEFAULT_STREET_MAP_DATA[t]];
+            } else {
+                DEFAULT_STREET_MAP_DATA[t].forEach(s => {
+                    if (!streetMapData[t].some(existing => normalizeStreetName(existing) === normalizeStreetName(s))) {
+                        streetMapData[t].push(s);
+                    }
+                });
+            }
+        });
+    } catch (e) {
+        console.warn("ensureStreetMapDataIntegrity hiba:", e);
+    }
+}
 
 // Teljes névből ékezetmentes admin e-mail cím készítése (pl. "Őri Csaba" -> "ori.csaba@bviz.admin")
 function formatAdminEmail(inputName) {
@@ -171,7 +216,7 @@ function handleWebLogin(event) {
     tryNextCandidate(0);
 }
 
-const WEB_VERSION = "1.5";
+const WEB_VERSION = "4.7";
 let cachedWebVersion = WEB_VERSION;
 
 function compareVersions(v1, v2) {
@@ -299,7 +344,10 @@ function handleWebLogout() {
     }
 }
 
+let currentTabName = 'electricity';
+
 function switchWebTab(tabName) {
+    if (tabName) currentTabName = tabName;
     const tabElec = document.getElementById('webTabElectricity');
     const tabClean = document.getElementById('webTabCleaning');
     const tabPump = document.getElementById('webTabPump');
@@ -327,7 +375,7 @@ function switchWebTab(tabName) {
             primaryBtn.innerHTML = '➕ Új Takarítás';
             primaryBtn.title = 'Új átemelő-takarítási esemény rögzítése a vezetői felületről.';
             primaryBtn.onclick = openAddCleaningModal;
-            primaryBtn.style.display = 'inline-block';
+            primaryBtn.style.display = 'inline-flex';
         }
         renderCleaningTable();
     } else if (tabName === 'pump') {
@@ -342,10 +390,7 @@ function switchWebTab(tabName) {
         if (rolloverBtn) rolloverBtn.style.display = 'none';
         if (haviOsszesito) haviOsszesito.style.display = 'none';
         if (primaryBtn) {
-            primaryBtn.innerHTML = '➕ Új Szivattyú Adat';
-            primaryBtn.title = 'Új szivattyú üzemóra vagy állapotadat rögzítése a vezetői felületről.';
-            primaryBtn.onclick = openAddPumpModal;
-            primaryBtn.style.display = 'inline-block';
+            primaryBtn.style.display = 'none';
         }
         renderPumpTable();
     } else if (tabName === 'pump_warehouse') {
@@ -375,10 +420,7 @@ function switchWebTab(tabName) {
         if (rolloverBtn) rolloverBtn.style.display = 'inline-flex';
         if (haviOsszesito) haviOsszesito.style.display = 'inline-flex';
         if (primaryBtn) {
-            primaryBtn.innerHTML = '➕ Új Leolvasás';
-            primaryBtn.title = 'Új villanyóra-állás rögzítése manuálisan a vezetői felületről — az adat azonnal frissül a rendszerben és a telefonos alkalmazásban is.';
-            primaryBtn.onclick = openAddElectricityModal;
-            primaryBtn.style.display = 'inline-block';
+            primaryBtn.style.display = 'none';
         }
         renderTable();
     }
@@ -440,7 +482,7 @@ function closeEditModal() {
     if (modal) modal.style.display = 'none';
 }
 
-function saveEditFromWeb() {
+async function saveEditFromWeb() {
     const origSettlement = document.getElementById('editOriginalSettlement') ? document.getElementById('editOriginalSettlement').value.trim() : '';
     const origMeterName = document.getElementById('editOriginalMeterName') ? document.getElementById('editOriginalMeterName').value.trim() : '';
     const settlementName = document.getElementById('editSettlement').value.trim();
@@ -459,89 +501,239 @@ function saveEditFromWeb() {
         const normOrigStreet = normalizeStreetName(origMeterName);
 
         const oldFixedDocId = `elec_${origSettlement}_${origMeterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-        if (typeof firebase !== 'undefined') {
-            try {
-                firebase.firestore().collection("electricity_readings").doc(oldFixedDocId).delete();
-            } catch (e) {}
-        }
+        const oldGeneralDocId = `${origSettlement}_${origMeterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
 
-        if (streetMapData[origSettlement]) {
-            const idx = streetMapData[origSettlement].findIndex(s => normalizeStreetName(s) === normOrigStreet);
-            if (idx >= 0) {
-                streetMapData[origSettlement][idx] = meterName;
-            }
-        }
+        const newFixedDocId = `elec_${settlementName}_${meterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+        const newGeneralDocId = `${settlementName}_${meterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
 
+        const db = (typeof firebase !== 'undefined' && firebase.firestore) ? firebase.firestore() : null;
+
+        // ----------------------------------------------------
+        // PHASE 1: DEEP COPY & MIGRATE ALL 4 MODULES UNDER NEW NAME
+        // ----------------------------------------------------
+
+        // 1. Electricity Readings & History Archive Documents (Villanyórák + hist_...)
         electricityReadings.forEach(r => {
             if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.meterName) === normOrigStreet) {
                 r.settlementName = settlementName;
                 r.meterName = meterName;
-                if (typeof firebase !== 'undefined') {
-                    try {
-                        firebase.firestore().collection("electricity_readings").doc(r.id).update({
-                            settlementName: settlementName,
-                            meterName: meterName
-                        });
-                    } catch (e) {}
+                if (r.id === oldFixedDocId) {
+                    r.id = newFixedDocId;
+                } else if (r.id.startsWith("hist_")) {
+                    const tsSuffix = r.id.substring(r.id.lastIndexOf("_"));
+                    r.id = `hist_${settlementName}_${meterName}${tsSuffix}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
                 }
             }
         });
 
-        cleaningRecords.forEach(r => {
+        if (db) {
+            try {
+                // Fetch ALL electricity_readings docs (both primary active elec_ and archived hist_...) for this settlement and street
+                const elecQuerySnap = await db.collection("electricity_readings").get();
+                for (const doc of elecQuerySnap.docs) {
+                    const data = doc.data();
+                    const docId = doc.id;
+                    const isMatch = (normalizeStreetName(data.settlementName) === normOrigTown && normalizeStreetName(data.meterName) === normOrigStreet) ||
+                                    docId.startsWith(`hist_${origSettlement}_${origMeterName}`.replace(/\s+/g, '_').replace(/\./g, '_')) ||
+                                    docId === oldFixedDocId;
+
+                    if (isMatch) {
+                        const newElecData = JSON.parse(JSON.stringify(data));
+                        newElecData.settlementName = settlementName;
+                        newElecData.meterName = meterName;
+                        newElecData.telepules = settlementName;
+                        newElecData.utca = meterName;
+
+                        let targetDocId = docId;
+                        if (docId === oldFixedDocId) {
+                            targetDocId = newFixedDocId;
+                        } else if (docId.startsWith("hist_")) {
+                            const tsSuffix = docId.substring(docId.lastIndexOf("_"));
+                            targetDocId = `hist_${settlementName}_${meterName}${tsSuffix}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+                        }
+
+                        await db.collection("electricity_readings").doc(targetDocId).set(newElecData, { merge: true });
+                        if (targetDocId !== docId) {
+                            await db.collection("electricity_readings").doc(docId).delete().catch(() => {});
+                        }
+                    }
+                }
+            } catch (e) {
+                console.warn("Electricity readings & history migration warning:", e);
+            }
+
+            try {
+                const readingsQuerySnap = await db.collection("readings").get();
+                for (const doc of readingsQuerySnap.docs) {
+                    const data = doc.data();
+                    const isMatch = normalizeStreetName(data.settlementName || data.plantName) === normOrigTown &&
+                                    normalizeStreetName(data.meterName || data.streetName) === normOrigStreet;
+                    if (isMatch) {
+                        await doc.ref.update({
+                            settlementName: settlementName,
+                            plantName: settlementName,
+                            meterName: meterName,
+                            streetName: meterName,
+                            telepules: settlementName,
+                            utca: meterName
+                        });
+                    }
+                }
+            } catch (e) {
+                console.warn("Readings collection migration warning:", e);
+            }
+        }
+
+        // 2. Cleaning Records & History (Takarítás)
+        for (let i = 0; i < cleaningRecords.length; i++) {
+            const r = cleaningRecords[i];
             if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.streetName) === normOrigStreet) {
                 r.settlementName = settlementName;
                 r.streetName = meterName;
-                if (typeof firebase !== 'undefined') {
-                    try {
-                        firebase.firestore().collection("cleaning_records").doc(r.id).update({
-                            settlementName: settlementName,
-                            streetName: meterName
-                        });
-                    } catch (e) {}
-                }
             }
-        });
+        }
 
-        pumpRecords.forEach(r => {
+        if (db) {
+            try {
+                const cleanQuerySnap = await db.collection("cleaning_records").get();
+                for (const doc of cleanQuerySnap.docs) {
+                    const data = doc.data();
+                    if (normalizeStreetName(data.settlementName) === normOrigTown && normalizeStreetName(data.streetName) === normOrigStreet) {
+                        await doc.ref.update({
+                            settlementName: settlementName,
+                            streetName: meterName,
+                            telepules: settlementName,
+                            utca: meterName
+                        });
+                    }
+                }
+            } catch (e) {
+                console.warn("Cleaning records history migration warning:", e);
+            }
+        }
+
+        // 3. Pump Records (Operational Pumps)
+        for (let i = 0; i < pumpRecords.length; i++) {
+            const r = pumpRecords[i];
             if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.streetName) === normOrigStreet) {
                 r.settlementName = settlementName;
                 r.streetName = meterName;
-                if (typeof firebase !== 'undefined') {
-                    try {
-                        firebase.firestore().collection("pump_records").doc(r.id).update({
-                            settlementName: settlementName,
-                            streetName: meterName
-                        });
-                    } catch (e) {}
-                }
+                r.id = newGeneralDocId;
             }
-        });
+        }
 
-        if (typeof firebase !== 'undefined') {
+        if (db) {
+            try {
+                const oldPumpSnap = await db.collection("pump_records").doc(oldGeneralDocId).get();
+                if (oldPumpSnap.exists) {
+                    const pumpData = JSON.parse(JSON.stringify(oldPumpSnap.data()));
+                    pumpData.settlementName = settlementName;
+                    pumpData.streetName = meterName;
+                    pumpData.telepules = settlementName;
+                    pumpData.utca = meterName;
+                    pumpData.timestamp = Date.now();
+                    await db.collection("pump_records").doc(newGeneralDocId).set(pumpData, { merge: true });
+                }
+            } catch (e) {
+                console.warn("Pump records migration warning:", e);
+            }
+        }
+
+        // 4. Pump Warehouse (Reserve Pumps)
+        for (let i = 0; i < pumpWarehouseRecords.length; i++) {
+            const r = pumpWarehouseRecords[i];
+            if (normalizeStreetName(r.settlementName) === normOrigTown && normalizeStreetName(r.streetName) === normOrigStreet) {
+                r.settlementName = settlementName;
+                r.streetName = meterName;
+                r.id = newGeneralDocId;
+            }
+        }
+
+        if (db) {
+            try {
+                const oldWhSnap = await db.collection("pump_warehouse").doc(oldGeneralDocId).get();
+                if (oldWhSnap.exists) {
+                    const whData = JSON.parse(JSON.stringify(oldWhSnap.data()));
+                    whData.settlementName = settlementName;
+                    whData.streetName = meterName;
+                    whData.telepules = settlementName;
+                    whData.utca = meterName;
+                    whData.timestamp = Date.now();
+                    await db.collection("pump_warehouse").doc(newGeneralDocId).set(whData, { merge: true });
+                }
+            } catch (e) {
+                console.warn("Pump warehouse migration warning:", e);
+            }
+        }
+
+        // 5. Custom Streets & Rename Mappings
+        if (db) {
             try {
                 const renameDocId = `rename_${origSettlement}_${origMeterName}`.replace(/\s+/g, '_').replace(/\./g, '_');
-                if (normalizeStreetName(meterName) === normalizeStreetName(origMeterName)) {
-                    firebase.firestore().collection("custom_streets").doc(renameDocId).delete();
-                } else {
-                    firebase.firestore().collection("custom_streets").doc(renameDocId).set({
-                        settlementName: settlementName,
-                        oldStreetName: origMeterName,
-                        newStreetName: meterName,
-                        timestamp: Date.now()
-                    }, { merge: true });
-                }
-            } catch (e) {}
+                await db.collection("custom_streets").doc(renameDocId).set({
+                    settlementName: settlementName,
+                    oldStreetName: origMeterName,
+                    newStreetName: meterName,
+                    timestamp: Date.now()
+                }, { merge: true });
+
+                await db.collection("custom_streets").doc(newGeneralDocId).set({
+                    settlementName: settlementName,
+                    streetName: meterName,
+                    timestamp: Date.now()
+                }, { merge: true });
+            } catch (e) {
+                console.warn("Custom streets rename mapping warning:", e);
+            }
+        }
+
+        // ----------------------------------------------------
+        // PHASE 2: DELETE OLD DOCUMENTS ONLY AFTER SUCCESSFUL MIGRATION
+        // ----------------------------------------------------
+
+        if (streetMapData[origSettlement]) {
+            const idx = streetMapData[origSettlement].findIndex(s => normalizeStreetName(s) === normOrigStreet);
+            if (idx >= 0) {
+                streetMapData[origSettlement][idx] = meterName; // In-place replacement at exact position!
+            } else if (!streetMapData[origSettlement].includes(meterName)) {
+                streetMapData[origSettlement].push(meterName);
+            }
+        }
+
+        if (db) {
+            try {
+                await Promise.all([
+                    db.collection("electricity_readings").doc(oldFixedDocId).delete().catch(() => {}),
+                    db.collection("pump_records").doc(oldGeneralDocId).delete().catch(() => {}),
+                    db.collection("pump_warehouse").doc(oldGeneralDocId).delete().catch(() => {}),
+                    db.collection("custom_streets").doc(oldGeneralDocId).delete().catch(() => {})
+                ]);
+                console.log("✔ Old documents successfully deleted after migration:", oldGeneralDocId);
+            } catch (e) {
+                console.warn("Firestore old doc deletion warning:", e);
+            }
         }
     }
 
-    const dayKwh = (dayKwhVal !== '' && !isNaN(Number(dayKwhVal)) && Number(dayKwhVal) > 0) ? Number(dayKwhVal) : 0;
-    const prevDayKwh = (prevDayKwhVal !== '' && !isNaN(Number(prevDayKwhVal)) && Number(prevDayKwhVal) > 0) ? Number(prevDayKwhVal) : null;
+    const parsedDay = parseKwhValue(dayKwhVal);
+    const dayKwh = (parsedDay !== null && parsedDay > 0) ? parsedDay : 0;
+    const parsedPrev = parseKwhValue(prevDayKwhVal);
+    const prevDayKwh = (parsedPrev !== null && parsedPrev > 0) ? parsedPrev : null;
     const fixedDocId = `elec_${settlementName}_${meterName}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
 
+    const searchTownNorm = isRenamed ? normalizeStreetName(origSettlement) : normalizeStreetName(settlementName);
+    const searchStreetNorm = isRenamed ? normalizeStreetName(origMeterName) : normalizeStreetName(meterName);
+
     let idx = electricityReadings.findIndex(r =>
-        normalizeStreetName(r.settlementName) === normalizeStreetName(settlementName) &&
-        normalizeStreetName(r.meterName) === normalizeStreetName(meterName)
+        normalizeStreetName(r.settlementName) === searchTownNorm &&
+        normalizeStreetName(r.meterName) === searchStreetNorm
     );
+    if (idx < 0) {
+        idx = electricityReadings.findIndex(r =>
+            normalizeStreetName(r.settlementName) === normalizeStreetName(settlementName) &&
+            normalizeStreetName(r.meterName) === normalizeStreetName(meterName)
+        );
+    }
 
     const payload = {
         settlementName: settlementName,
@@ -554,7 +746,7 @@ function saveEditFromWeb() {
         timestamp: Date.now()
     };
 
-    if (prevDayKwh !== null && !isNaN(prevDayKwh) && prevDayKwh > 0) {
+    if (prevDayKwh !== null && prevDayKwh > 0) {
         payload.prevDayKwh = prevDayKwh;
     } else if (typeof firebase !== 'undefined') {
         payload.prevDayKwh = firebase.firestore.FieldValue.delete();
@@ -567,10 +759,11 @@ function saveEditFromWeb() {
     }
 
     if (idx >= 0) {
+        electricityReadings[idx].id = fixedDocId;
         electricityReadings[idx].settlementName = settlementName;
         electricityReadings[idx].meterName = meterName;
         electricityReadings[idx].dayKwh = dayKwh;
-        if (prevDayKwh !== null && !isNaN(prevDayKwh)) {
+        if (prevDayKwh !== null && prevDayKwh > 0) {
             electricityReadings[idx].prevDayKwh = prevDayKwh;
         } else {
             delete electricityReadings[idx].prevDayKwh;
@@ -594,6 +787,26 @@ function saveEditFromWeb() {
         };
         electricityReadings.unshift(newRecord);
     }
+
+    // Deduplicate memory array by normalized key so duplicates NEVER exist (keeping hist_ records intact)
+    const seenElecKeys = new Set();
+    electricityReadings = electricityReadings.filter(r => {
+        if (!r) return false;
+        if (r.id && String(r.id).startsWith("hist_")) return true;
+        const k = `${normalizeStreetName(r.settlementName)}_${normalizeStreetName(r.meterName)}`;
+        if (seenElecKeys.has(k)) return false;
+        seenElecKeys.add(k);
+        return true;
+    });
+
+    // Deduplicate and ensure streetMapData for settlement
+    if (!streetMapData[settlementName]) {
+        streetMapData[settlementName] = [meterName];
+    } else if (!streetMapData[settlementName].includes(meterName)) {
+        streetMapData[settlementName].push(meterName);
+    }
+    streetMapData[settlementName] = [...new Set(streetMapData[settlementName])];
+    ensureStreetMapDataIntegrity();
 
     if (typeof firebase !== 'undefined') {
         try {
@@ -629,102 +842,135 @@ function deleteReadingFromWeb(docId) {
 }
 
 function exportToExcel() {
-    const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
-    const searchQuery = document.getElementById('electricitySearch') ? document.getElementById('electricitySearch').value.trim().toLowerCase() : '';
+    try {
+        ensureStreetMapDataIntegrity();
+        const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
+        const statusFilter = document.getElementById('electricityStatusFilter') ? document.getElementById('electricityStatusFilter').value : 'ALL';
+        const searchQuery = document.getElementById('electricitySearch') ? String(document.getElementById('electricitySearch').value ?? '').trim().toLowerCase() : '';
 
-    const townsToInclude = (plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter])
-        .sort((a, b) => a.localeCompare(b, 'hu'));
+        const townsToInclude = (plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter])
+            .sort((a, b) => a.localeCompare(b, 'hu'));
 
-    let exportRows = [];
+        let exportRows = [];
 
-    townsToInclude.forEach(town => {
-        const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
-        streets.forEach(street => {
-            const normTown = normalizeStreetName(town);
-            const normStreet = normalizeStreetName(street);
+        townsToInclude.forEach(town => {
+            const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+            streets.forEach(street => {
+                try {
+                    const normTown = normalizeStreetName(town);
+                    const normStreet = normalizeStreetName(street);
 
-            const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-            const sameMeterReadings = electricityReadings.filter(r =>
-                normalizeStreetName(r.settlementName) === normTown &&
-                normalizeStreetName(r.meterName) === normStreet
-            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+                    const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+                    const sameMeterReadings = (electricityReadings || []).filter(r =>
+                        normalizeStreetName(r.settlementName) === normTown &&
+                        normalizeStreetName(r.meterName) === normStreet
+                    ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
 
-            const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !r.id.startsWith("hist_")) || sameMeterReadings[0] || null;
+                    const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !String(r.id ?? '').startsWith("hist_")) || sameMeterReadings[0] || null;
 
-            let prevKwhNum = null;
-            let currKwhNum = null;
+                    let prevKwhNum = null;
+                    let currKwhNum = null;
+                    let diffVal = null;
+                    let diffStatus = 'NONE';
+                    let dateStr = '—';
+                    let uploaderName = '—';
+                    let noteText = '—';
 
-            if (primaryReading) {
-                const baselinePrev = (primaryReading.prevDayKwh && primaryReading.prevDayKwh > 0)
-                    ? primaryReading.prevDayKwh
-                    : null;
+                    if (primaryReading) {
+                        dateStr = String(primaryReading.dateString || '—').trim();
+                        noteText = String(primaryReading.note || '—').trim();
+                        if (primaryReading.userName && String(primaryReading.userName).trim() !== '') {
+                            uploaderName = String(primaryReading.userName).trim();
+                        }
 
-                if (baselinePrev !== null && baselinePrev > 0) {
-                    prevKwhNum = Math.round(baselinePrev);
+                        const parsedPrev = parseKwhValue(primaryReading.prevDayKwh);
+                        if (parsedPrev !== null && parsedPrev > 0) {
+                            prevKwhNum = Math.round(parsedPrev);
+                        }
+
+                        const parsedCurr = parseKwhValue(primaryReading.dayKwh);
+                        if (parsedCurr !== null && parsedCurr > 0) {
+                            currKwhNum = Math.round(parsedCurr);
+                        }
+
+                        if (currKwhNum !== null && prevKwhNum !== null) {
+                            diffVal = currKwhNum - prevKwhNum;
+                            if (diffVal > 0) diffStatus = 'UP';
+                            else if (diffVal < 0) diffStatus = 'DOWN';
+                            else diffStatus = 'NONE';
+                        }
+                    }
+
+                    if (statusFilter === 'UP' && diffStatus !== 'UP') return;
+                    if (statusFilter === 'DOWN' && diffStatus !== 'DOWN') return;
+                    if (statusFilter === 'NONE' && diffStatus !== 'NONE') return;
+
+                    exportRows.push({
+                        town: town,
+                        street: street,
+                        prevKwhNum: prevKwhNum,
+                        currKwhNum: currKwhNum,
+                        diffVal: diffVal,
+                        dateStr: dateStr,
+                        uploaderName: uploaderName,
+                        noteText: noteText
+                    });
+                } catch (rowExportErr) {
+                    console.warn("Hiba export sor összeállításánál:", rowExportErr);
                 }
-
-                if (primaryReading.dayKwh > 0) {
-                    currKwhNum = Math.round(primaryReading.dayKwh);
-                }
-            }
-
-            exportRows.push({
-                town: town,
-                street: street,
-                prevKwhNum: prevKwhNum,
-                currKwhNum: currKwhNum
             });
         });
-    });
 
-    if (searchQuery) {
-        exportRows = exportRows.filter(r =>
-            (r.town || '').toLowerCase().includes(searchQuery) ||
-            (r.street || '').toLowerCase().includes(searchQuery) ||
-            (r.prevKwhNum !== null && r.prevKwhNum.toString().includes(searchQuery)) ||
-            (r.currKwhNum !== null && r.currKwhNum.toString().includes(searchQuery))
-        );
+        if (searchQuery) {
+            exportRows = exportRows.filter(r =>
+                String(r.town ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.street ?? '').toLowerCase().includes(searchQuery) ||
+                (r.prevKwhNum !== null && String(r.prevKwhNum).includes(searchQuery)) ||
+                (r.currKwhNum !== null && String(r.currKwhNum).includes(searchQuery)) ||
+                String(r.uploaderName ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.dateStr ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.noteText ?? '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        if (exportRows.length === 0) {
+            alert("Nincs letölthető villanyóra leolvasási adat a kiválasztott szűréshez!");
+            return;
+        }
+
+        let csvContent = "\uFEFF";
+        csvContent += "Település;Utca;Előző Óraállás (kWh);Óraállás (kWh);Különbség (kWh);Leolvasás Dátuma;Rögzítő Neve;Megjegyzés\n";
+
+        exportRows.forEach(item => {
+            const diffDisplay = item.diffVal !== null ? (item.diffVal > 0 ? `+${item.diffVal}` : `${item.diffVal}`) : "—";
+            const line = [
+                `"${String(item.town ?? '').replace(/"/g, '""')}"`,
+                `"${String(item.street ?? '').replace(/"/g, '""')}"`,
+                `"${item.prevKwhNum !== null ? item.prevKwhNum : '—'}"`,
+                `"${item.currKwhNum !== null ? item.currKwhNum : '—'}"`,
+                `"${diffDisplay}"`,
+                `"${String(item.dateStr ?? '—').replace(/"/g, '""')}"`,
+                `"${String(item.uploaderName ?? '—').replace(/"/g, '""')}"`,
+                `"${String(item.noteText ?? '—').replace(/"/g, '""')}"`
+            ].join(";");
+            csvContent += line + "\n";
+        });
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement("a");
+        const url = URL.createObjectURL(blob);
+        const dateStr = new Date().toISOString().slice(0, 10);
+        const fileName = `Villanyora_allasok_${dateStr}.csv`;
+
+        link.setAttribute("href", url);
+        link.setAttribute("download", fileName);
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+    } catch (err) {
+        console.error("Hiba az exportálás során:", err);
+        alert("Hiba történt az exportálás során: " + err.message);
     }
-
-    if (exportRows.length === 0) {
-        alert("Nincs letölthető villanyóra leolvasási adat!");
-        return;
-    }
-
-    if (typeof XLSX === 'undefined') {
-        alert("Hiba: Az Excel (SheetJS) könyvtár nincs betöltve az oldalon!");
-        return;
-    }
-
-    const dataForSheet = [
-        ["Település", "Utca", "Előző Óraállás", "Óraállás"]
-    ];
-
-    exportRows.forEach(item => {
-        dataForSheet.push([
-            item.town,
-            item.street,
-            item.prevKwhNum !== null ? item.prevKwhNum : "",
-            item.currKwhNum !== null ? item.currKwhNum : ""
-        ]);
-    });
-
-    const ws = XLSX.utils.aoa_to_sheet(dataForSheet);
-
-    ws['!cols'] = [
-        { wch: 22 },
-        { wch: 32 },
-        { wch: 18 },
-        { wch: 15 }
-    ];
-
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Villanyóra Állások");
-
-    const dateStr = new Date().toISOString().slice(0, 10);
-    const fileName = `Villanyora_allasok_${dateStr}.xlsx`;
-
-    XLSX.writeFile(wb, fileName);
 }
 
 function resolveDisplayName(rawName, rawEmail) {
@@ -848,16 +1094,14 @@ function setCleaningViewMode(mode) {
     const btnHistory = document.getElementById('cleaningViewHistory');
     if (btnOverview && btnHistory) {
         if (mode === 'overview') {
-            btnOverview.style.background = '#0077b6';
-            btnOverview.style.color = '#ffffff';
-            btnHistory.style.background = 'transparent';
-            btnHistory.style.color = '#64748b';
+            btnOverview.classList.add('active');
+            btnHistory.classList.remove('active');
         } else {
-            btnHistory.style.background = '#0077b6';
-            btnHistory.style.color = '#ffffff';
-            btnOverview.style.background = 'transparent';
-            btnOverview.style.color = '#64748b';
+            btnHistory.classList.add('active');
+            btnOverview.classList.remove('active');
         }
+        btnOverview.removeAttribute('style');
+        btnHistory.removeAttribute('style');
     }
     renderCleaningTable();
 }
@@ -956,7 +1200,7 @@ function closeLocationCleaningHistoryModal() {
 function renderCleaningTable() {
     const tbody = document.getElementById('cleaningTableBody');
     const plantFilter = document.getElementById('cleaningPlantFilter') ? document.getElementById('cleaningPlantFilter').value : 'ALL';
-    const statusFilter = document.getElementById('cleaningStatusFilter') ? document.getElementById('cleaningStatusFilter').value : 'ALL';
+    const statusFilter = selectedCleaningStatusValue || 'ALL';
     const searchQuery = document.getElementById('cleaningSearch') ? document.getElementById('cleaningSearch').value.trim().toLowerCase() : '';
     const pageSizeVal = document.getElementById('cleaningPageSize') ? document.getElementById('cleaningPageSize').value : '25';
 
@@ -1008,7 +1252,7 @@ function renderCleaningTable() {
                         streetName: street,
                         dateString: 'Még nincs adat',
                         userName: '-',
-                        note: 'Még nincs tisztítási előzmény rögzítve'
+                        note: '-'
                     },
                     daysAgo: 9999,
                     status: 'OVERDUE',
@@ -1033,22 +1277,22 @@ function renderCleaningTable() {
         if (cleaningViewMode === 'overview') {
             headerRow.innerHTML = `
                 <th style="width: 14%;">Utolsó Takarítás</th>
-                <th style="width: 15%;">Állapot</th>
-                <th style="width: 14%;">Település</th>
+                <th style="width: 13%;">Település</th>
                 <th style="width: 18%;">Utca / Helyszín</th>
+                <th style="width: 15%;">Állapot</th>
                 <th style="width: 21%;">Megjegyzés</th>
-                <th style="width: 14%;">Rögzítő Neve</th>
-                <th style="width: 9%; text-align: center;">Műveletek</th>
+                <th style="width: 12%;">Rögzítő Neve</th>
+                <th style="width: 125px; min-width: 125px; text-align: center;">Műveletek</th>
             `;
         } else {
             headerRow.innerHTML = `
                 <th style="width: 14%;">Takarítás Dátuma</th>
-                <th style="width: 15%;">Állapot</th>
-                <th style="width: 14%;">Település</th>
+                <th style="width: 13%;">Település</th>
                 <th style="width: 18%;">Utca / Helyszín</th>
+                <th style="width: 15%;">Állapot</th>
                 <th style="width: 21%;">Megjegyzés</th>
-                <th style="width: 14%;">Rögzítő Neve</th>
-                <th style="width: 9%; text-align: center;">Műveletek</th>
+                <th style="width: 12%;">Rögzítő Neve</th>
+                <th style="width: 125px; min-width: 125px; text-align: center;">Műveletek</th>
             `;
         }
     }
@@ -1113,13 +1357,13 @@ function renderCleaningTable() {
             const escapedStreet = (loc.streetName || '').replace(/'/g, "\\'");
             row.innerHTML = `
                 <td><strong>${loc.latestRecord.dateString}</strong></td>
-                <td>${getCleaningStatusBadgeHTML(loc.daysAgo)}</td>
-                <td><span class="settlement-badge">${TRUCK_SVG_ICON}${loc.settlementName}</span></td>
+                <td><span class="settlement-badge">${loc.settlementName}</span></td>
                 <td><strong>${loc.streetName}</strong></td>
+                <td>${getCleaningStatusBadgeHTML(loc.daysAgo)}</td>
                 <td>${loc.latestRecord.note || '-'}</td>
                 <td style="white-space: nowrap;"><strong style="color: #0077b6;">${loc.latestRecord.userName || 'Mizsei Márk'}</strong></td>
-                <td style="text-align: center; white-space: nowrap;">
-                    <button onclick="openLocationCleaningHistoryModal('${loc.key}', '${escapedTown}', '${escapedStreet}')" class="btn-icon-edit" style="width: auto; padding: 4px 10px; font-weight: bold; font-size: 12px; height: auto;" title="Előzmények megtekintése">
+                <td style="text-align: center; white-space: nowrap; padding: 8px 4px;">
+                    <button onclick="openLocationCleaningHistoryModal('${loc.key}', '${escapedTown}', '${escapedStreet}')" class="btn-history-pill" title="Előzmények megtekintése">
                         📝 ${loc.historyRecords.length} előzmény
                     </button>
                 </td>
@@ -1193,9 +1437,9 @@ function renderCleaningTable() {
             };
             row.innerHTML = `
                 <td><strong>${rec.dateString}</strong></td>
-                <td>${getCleaningStatusBadgeHTML(item.daysAgo)}</td>
-                <td><span class="settlement-badge">${TRUCK_SVG_ICON}${rec.settlementName || 'Apaj'}</span></td>
+                <td><span class="settlement-badge">${rec.settlementName || 'Apaj'}</span></td>
                 <td><strong>${rec.streetName || 'Helyszín'}</strong></td>
+                <td>${getCleaningStatusBadgeHTML(item.daysAgo)}</td>
                 <td>${rec.note || '-'}</td>
                 <td style="white-space: nowrap;"><strong style="color: #0077b6;">${rec.userName || 'Mizsei Márk'}</strong></td>
                 <td style="text-align: center; white-space: nowrap;">
@@ -1206,6 +1450,8 @@ function renderCleaningTable() {
             tbody.appendChild(row);
         });
     }
+
+    applySavedColumnConfigToTable(cleaningViewMode === 'overview' ? 'bviz_cols_takaritas_allapot' : 'bviz_cols_takaritas_naplo');
 }
 
 function renderPumpStreetList() {
@@ -1670,12 +1916,54 @@ function exportCleaningToExcel() {
 }
 
 let selectedPumpStatusValue = 'ALL';
+let selectedPumpWarehouseStatusValue = 'ALL';
+let selectedCleaningStatusValue = 'ALL';
+
+function toggleCleaningStatusDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('cleaningCustomStatusMenu');
+    const pumpMenu = document.getElementById('pumpCustomStatusMenu');
+    const whMenu = document.getElementById('pumpWhCustomStatusMenu');
+    if (pumpMenu) pumpMenu.style.display = 'none';
+    if (whMenu) whMenu.style.display = 'none';
+
+    if (menu) {
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
+}
+
+function selectCleaningStatusOption(val) {
+    selectedCleaningStatusValue = val;
+    const selectedSpan = document.getElementById('cleaningCustomStatusSelected');
+    const menu = document.getElementById('cleaningCustomStatusMenu');
+
+    if (selectedSpan) {
+        if (val === 'OVERDUE') {
+            selectedSpan.innerHTML = '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block; border: 1px solid #ef4444;">⚠ Esedékes (>60 nap)</span>';
+        } else if (val === 'WARNING') {
+            selectedSpan.innerHTML = '<span style="background: #d97706; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block; border: 1px solid #f59e0b;">⏳ Közeleg (31-60 nap)</span>';
+        } else if (val === 'OK') {
+            selectedSpan.innerHTML = '<span style="background: #16a34a; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block; border: 1px solid #22c55e;">✓ Rendben (0-30 nap)</span>';
+        } else {
+            selectedSpan.innerHTML = '<span style="font-size: 13px; font-weight: 600;">Minden állapot</span>';
+        }
+    }
+
+    if (menu) menu.style.display = 'none';
+
+    currentCleaningPage = 1;
+    renderCleaningTable();
+}
 
 function togglePumpStatusDropdown(e) {
     if (e) e.stopPropagation();
     const menu = document.getElementById('pumpCustomStatusMenu');
+    const whMenu = document.getElementById('pumpWhCustomStatusMenu');
+    const cleanMenu = document.getElementById('cleaningCustomStatusMenu');
+    if (whMenu) whMenu.style.display = 'none';
+    if (cleanMenu) cleanMenu.style.display = 'none';
     if (menu) {
-        menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
     }
 }
 
@@ -1685,14 +1973,14 @@ function selectPumpStatusOption(val) {
     const menu = document.getElementById('pumpCustomStatusMenu');
 
     if (selectedSpan) {
-        if (val === 'ALL') {
-            selectedSpan.innerHTML = 'Minden állapot';
-        } else if (val === '1') {
-            selectedSpan.innerHTML = '<span class="pump-pill-badge badge-working">● Üzemel</span>';
+        if (val === '1') {
+            selectedSpan.innerHTML = '<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">• Üzemel</span>';
         } else if (val === '2') {
-            selectedSpan.innerHTML = '<span class="pump-pill-badge badge-faulty">● Hibás</span>';
+            selectedSpan.innerHTML = '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">• Hibás</span>';
         } else if (val === '0') {
-            selectedSpan.innerHTML = '<span class="pump-pill-badge badge-none">Nincs szivattyú</span>';
+            selectedSpan.innerHTML = '<span style="background: #475569; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>';
+        } else {
+            selectedSpan.innerHTML = '<span style="font-size: 13px; font-weight: 600;">Minden állapot</span>';
         }
     }
 
@@ -1702,11 +1990,56 @@ function selectPumpStatusOption(val) {
     renderPumpTable();
 }
 
+function togglePumpWhStatusDropdown(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('pumpWhCustomStatusMenu');
+    const pumpMenu = document.getElementById('pumpCustomStatusMenu');
+    const cleanMenu = document.getElementById('cleaningCustomStatusMenu');
+    if (pumpMenu) pumpMenu.style.display = 'none';
+    if (cleanMenu) cleanMenu.style.display = 'none';
+    if (menu) {
+        menu.style.display = menu.style.display === 'block' ? 'none' : 'block';
+    }
+}
+
+function selectPumpWhStatusOption(val) {
+    selectedPumpWarehouseStatusValue = val;
+    const selectedSpan = document.getElementById('pumpWhCustomStatusSelected');
+    const menu = document.getElementById('pumpWhCustomStatusMenu');
+
+    if (selectedSpan) {
+        if (val === 'VAN') {
+            selectedSpan.innerHTML = '<span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">• Van</span>';
+        } else if (val === 'NINCS') {
+            selectedSpan.innerHTML = '<span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 3px 10px; border-radius: 20px; font-size: 12px; display: inline-block;">• Nincs</span>';
+        } else {
+            selectedSpan.innerHTML = '<span style="font-size: 13px; font-weight: 600;">Minden állapot</span>';
+        }
+    }
+
+    if (menu) menu.style.display = 'none';
+
+    currentPumpWarehousePage = 1;
+    renderPumpWarehouseTable();
+}
+
 document.addEventListener('click', function(e) {
-    const dropdown = document.getElementById('pumpCustomStatusDropdown');
-    const menu = document.getElementById('pumpCustomStatusMenu');
-    if (dropdown && menu && !dropdown.contains(e.target)) {
-        menu.style.display = 'none';
+    const pumpDropdown = document.getElementById('pumpCustomStatusDropdown');
+    const pumpMenu = document.getElementById('pumpCustomStatusMenu');
+    if (pumpDropdown && pumpMenu && !pumpDropdown.contains(e.target)) {
+        pumpMenu.style.display = 'none';
+    }
+
+    const whDropdown = document.getElementById('pumpWhCustomStatusDropdown');
+    const whMenu = document.getElementById('pumpWhCustomStatusMenu');
+    if (whDropdown && whMenu && !whDropdown.contains(e.target)) {
+        whMenu.style.display = 'none';
+    }
+
+    const cleanDropdown = document.getElementById('cleaningCustomStatusDropdown');
+    const cleanMenu = document.getElementById('cleaningCustomStatusMenu');
+    if (cleanDropdown && cleanMenu && !cleanDropdown.contains(e.target)) {
+        cleanMenu.style.display = 'none';
     }
 });
 
@@ -1851,8 +2184,16 @@ function renderPumpTable() {
     });
 
     if (statusFilter !== 'ALL') {
-        const targetState = parseInt(statusFilter, 10);
-        allStreetRows = allStreetRows.filter(r => (r.pump1State === targetState || r.pump2State === targetState));
+        allStreetRows = allStreetRows.filter(r => {
+            const p1Val = Number(r.pump1State) === 1 || Boolean(r.pump1State);
+            const p2Val = Number(r.pump2State) === 1 || Boolean(r.pump2State);
+            const hasVan = p1Val || p2Val;
+            if (statusFilter === 'VAN' || statusFilter === '1') return hasVan;
+            if (statusFilter === 'NINCS' || statusFilter === '0') return !hasVan;
+            const targetState = parseInt(statusFilter, 10);
+            if (!isNaN(targetState)) return (Number(r.pump1State) === targetState || Number(r.pump2State) === targetState);
+            return true;
+        });
     }
 
     if (searchQuery) {
@@ -1916,7 +2257,7 @@ function renderPumpTable() {
         };
         row.innerHTML = `
             <td><strong>${item.dateString || '2026. 11. 11.'}</strong></td>
-            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">🛠️ ${item.settlementName || 'Apaj'}</span></td>
+            <td><span class="settlement-badge">${item.settlementName || 'Apaj'}</span></td>
             <td><strong>${item.streetName || 'Helyszín'}</strong></td>
             <td>${p1StatusBadge} ${p1Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p1Details + ')</span>' : ''}</td>
             <td>${p2StatusBadge} ${p2Details ? '<span style="color: #334155; font-size: 13px; font-weight: 500; margin-left: 6px;">(' + p2Details + ')</span>' : ''}</td>
@@ -1925,6 +2266,8 @@ function renderPumpTable() {
         `;
         tbody.appendChild(row);
     });
+
+    applySavedColumnConfigToTable('bviz_cols_szivattyu');
 }
 
 function initDashboard() {
@@ -1942,24 +2285,34 @@ function initDashboard() {
             db.collection("electricity_readings").onSnapshot((snapshot) => {
                 const list = [];
                 snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const rawEmail = (data.userEmail || "").trim().toLowerCase();
-                    const rawName = (data.userName || "").trim();
+                    const data = doc.data() || {};
+                    const rawEmail = String(data.userEmail ?? "").trim().toLowerCase();
+                    const rawName = String(data.userName ?? "").trim();
+                    const settlement = String(data.settlementName || data.plantName || data.telepules || "Apaj").trim();
+                    const meter = String(data.meterName || data.streetName || data.utca || "Helyszín").trim();
+
+                    if (settlement && meter && settlement !== "Apaj" && meter !== "Helyszín") {
+                        if (!streetMapData[settlement]) streetMapData[settlement] = [];
+                        if (!streetMapData[settlement].some(s => normalizeStreetName(s) === normalizeStreetName(meter))) {
+                            streetMapData[settlement].push(meter);
+                        }
+                    }
 
                     list.push({
                         id: doc.id,
-                        settlementName: data.settlementName || "Apaj",
-                        meterName: data.meterName || "Helyszín",
-                        dateString: data.dateString || "",
+                        settlementName: settlement,
+                        meterName: meter,
+                        dateString: String(data.dateString || data.datum || "").trim(),
                         timestamp: Number(data.timestamp) || 0,
-                        dayKwh: Number(data.dayKwh) || 0,
-                        prevDayKwh: (data.prevDayKwh !== undefined && data.prevDayKwh !== null) ? Number(data.prevDayKwh) : null,
+                        dayKwh: parseKwhValue(data.dayKwh !== undefined ? data.dayKwh : (data.oraallas !== undefined ? data.oraallas : data.kwh)),
+                        prevDayKwh: parseKwhValue(data.prevDayKwh !== undefined ? data.prevDayKwh : data.elozoOraallas),
                         userEmail: rawEmail,
                         userName: resolveDisplayName(rawName, rawEmail),
-                        note: data.note || ""
+                        note: String(data.note || data.megjegyzes || "")
                     });
                 });
                 electricityReadings = list;
+                ensureStreetMapDataIntegrity();
                 renderTable();
                 updateMonthlyProgressSummaryWeb();
             }, (error) => {
@@ -1968,11 +2321,19 @@ function initDashboard() {
 
             db.collection("custom_street_order").onSnapshot((snapshot) => {
                 snapshot.forEach((doc) => {
-                    const data = doc.data();
+                    const data = doc.data() || {};
                     if (data.settlementName && Array.isArray(data.streetsOrder)) {
-                        streetMapData[data.settlementName] = data.streetsOrder;
+                        const existingList = streetMapData[data.settlementName] || (DEFAULT_STREET_MAP_DATA[data.settlementName] ? [...DEFAULT_STREET_MAP_DATA[data.settlementName]] : []);
+                        const mergedOrder = [...data.streetsOrder];
+                        existingList.forEach(st => {
+                            if (!mergedOrder.some(s => normalizeStreetName(s) === normalizeStreetName(st))) {
+                                mergedOrder.push(st);
+                            }
+                        });
+                        streetMapData[data.settlementName] = mergedOrder;
                     }
                 });
+                ensureStreetMapDataIntegrity();
                 renderTable();
             }, (error) => {
                 console.warn("Firestore custom_street_order snapshot error:", error);
@@ -1980,18 +2341,19 @@ function initDashboard() {
 
             db.collection("custom_streets").onSnapshot((snapshot) => {
                 snapshot.forEach((doc) => {
-                    const data = doc.data();
-                    const town = data.settlementName;
-                    const street = data.streetName;
+                    const data = doc.data() || {};
+                    const town = String(data.settlementName || data.telepules || '').trim();
+                    const street = String(data.streetName || data.utca || '').trim();
                     if (town && street) {
                         if (!streetMapData[town]) {
                             streetMapData[town] = [];
                         }
-                        if (!streetMapData[town].includes(street)) {
+                        if (!streetMapData[town].some(s => normalizeStreetName(s) === normalizeStreetName(street))) {
                             streetMapData[town].push(street);
                         }
                     }
                 });
+                ensureStreetMapDataIntegrity();
                 updateAddElecStreetDropdown();
                 updateAddCleanStreetDropdown();
                 updateAddPumpStreetDropdown();
@@ -2309,6 +2671,302 @@ function saveCurrentWarehousePump(shouldReRender = false) {
     }, 400);
 }
 
+let currentTransferPumpIdx = null;
+
+function updateTransferTargetStreets(targetTown, selectedStreet) {
+    const townEl = document.getElementById('transferTargetTown');
+    const streetEl = document.getElementById('transferTargetStreet');
+    if (!streetEl) return;
+
+    const selectedTown = targetTown || (townEl ? townEl.value : currentWarehouseVisualTown);
+    const streets = (streetMapData[selectedTown] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+
+    const streetToSelect = selectedStreet || (selectedTown === currentWarehouseVisualTown ? currentWarehouseVisualStreet : (streets[0] || ''));
+
+    streetEl.innerHTML = streets.map(s => `<option value="${s}" ${s === streetToSelect ? 'selected' : ''}>${s}</option>`).join('');
+}
+
+function promptTransferWarehousePump(pumpIdx) {
+    saveCurrentWarehousePump(false);
+
+    const filledIndices = [];
+    currentWarehousePumps.forEach((p, i) => {
+        const fajta = (p.fajta || p.type || '').trim();
+        const serial = (p.gyariSzam || p.serial || '').trim();
+        const model = (p.tipus || p.model || '').trim();
+        const impeller = (p.jarokerekSzam || p.impeller || '').trim();
+        const owner = (p.tulajdonos || p.owner || '').trim();
+        const isActive = Number(p.state) === 1 || Boolean(p.active);
+
+        if (fajta || serial || model || impeller || owner || isActive) {
+            filledIndices.push(i);
+        }
+    });
+
+    if (filledIndices.length === 0) {
+        alert("Nincs rögzített tartalék szivattyú adat az átvitelhez!");
+        return;
+    }
+
+    if (pumpIdx === undefined || pumpIdx === null) {
+        pumpIdx = filledIndices[0];
+    } else if (!filledIndices.includes(pumpIdx)) {
+        alert("Nincs rögzített tartalék szivattyú adat az átvitelhez!");
+        return;
+    }
+
+    currentTransferPumpIdx = pumpIdx;
+
+    const defaultTowns = ["Apaj", "Kunszentmiklós", "Apostag", "Dunavecse", "Szabadszállás", "Kunadacs", "Szalkszentmárton", "Tass", "Kunpeszér"];
+    const allTownOptions = [...new Set([...defaultTowns, ...Object.keys(streetMapData)])].sort((a, b) => a.localeCompare(b, 'hu'));
+    const townSelectHTML = allTownOptions.map(t => `<option value="${t}" ${t === currentWarehouseVisualTown ? 'selected' : ''}>${t}</option>`).join('');
+
+    let sourcePickerHTML = '';
+    if (filledIndices.length > 1) {
+        const options = filledIndices.map(i => {
+            const wp = currentWarehousePumps[i];
+            const name = wp.fajta || wp.type || 'Névtelen';
+            const serial = wp.gyariSzam || wp.serial || 'Gyári szám nélkül';
+            return `<option value="${i}" ${i === pumpIdx ? 'selected' : ''}>${i + 1}. sz. Tartalék szivattyú (${name} - ${serial})</option>`;
+        }).join('');
+
+        sourcePickerHTML = `
+            <div style="margin-bottom: 14px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; color: #475569; margin-bottom: 4px;">Melyik tartalék szivattyút viszed át?</label>
+                <select id="transferSourceSelect" onchange="currentTransferPumpIdx = parseInt(this.value, 10)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #0f172a; background: #ffffff; outline: none;">
+                    ${options}
+                </select>
+            </div>
+        `;
+    }
+
+    let modal = document.getElementById('transferPumpModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'transferPumpModal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.65); justify-content: center; align-items: center; z-index: 99999; backdrop-filter: blur(4px); display: none;';
+        document.body.appendChild(modal);
+    }
+
+    modal.innerHTML = `
+        <div class="visual-modal-card" style="background: #ffffff; padding: 24px; border-radius: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.25); width: 100%; max-width: 480px; text-align: center; border: 1px solid #cbd5e1; box-sizing: border-box;">
+            <div style="background: rgba(2, 132, 199, 0.1); width: 52px; height: 52px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto;">
+                <span style="font-size: 26px; color: #0284c7;">⇄</span>
+            </div>
+            <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 6px 0;" class="wh-card-title">Beépítés a Szivattyúkhoz</h3>
+            <p style="font-size: 13px; font-weight: bold; color: #0284c7; margin: 0 0 14px 0;">Célhelyszín kiválasztása</p>
+
+            ${sourcePickerHTML}
+
+            <div style="margin-bottom: 14px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; color: #475569; margin-bottom: 4px;">Cél település:</label>
+                <select id="transferTargetTown" onchange="updateTransferTargetStreets(this.value)" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #0f172a; background: #ffffff; outline: none;">
+                    ${townSelectHTML}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; color: #475569; margin-bottom: 4px;">Cél utca / átemelő:</label>
+                <select id="transferTargetStreet" style="width: 100%; padding: 10px; border-radius: 8px; border: 1px solid #cbd5e1; font-size: 13px; font-weight: bold; color: #0f172a; background: #ffffff; outline: none;">
+                </select>
+            </div>
+
+            <p style="font-size: 12px; color: #64748b; margin: 0 0 18px 0; line-height: 1.4;">
+                A meglévő üzemi szivattyú adatai felülíródnak a célhelyszínen, a raktári mezők pedig kiürülnek.
+            </p>
+
+            <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <button onclick="executeTransferWarehousePump(1)" style="flex: 1; background: #0284c7; color: white; border: none; padding: 12px 14px; border-radius: 10px; font-size: 13.5px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 6px rgba(2,132,199,0.3);">
+                    1. sz. Szivattyú helyére
+                </button>
+                <button onclick="executeTransferWarehousePump(2)" style="flex: 1; background: #0284c7; color: white; border: none; padding: 12px 14px; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 2px 6px rgba(2,132,199,0.3);">
+                    2. sz. Szivattyú helyére
+                </button>
+            </div>
+
+            <button onclick="closeTransferPumpModal()" style="width: 100%; background: #64748b; color: white; border: none; padding: 10px; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer;">
+                Mégse
+            </button>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+    updateTransferTargetStreets(currentWarehouseVisualTown, currentWarehouseVisualStreet);
+}
+
+function closeTransferPumpModal() {
+    const modal = document.getElementById('transferPumpModal');
+    if (modal) modal.style.display = 'none';
+    currentTransferPumpIdx = null;
+}
+
+function executeTransferWarehousePump(targetPos) {
+    if (currentTransferPumpIdx === null || currentTransferPumpIdx === undefined) return;
+    const pumpIdx = currentTransferPumpIdx;
+    const wp = currentWarehousePumps[pumpIdx];
+    if (!wp) return;
+
+    if (webWarehouseSaveTimeout) {
+        clearTimeout(webWarehouseSaveTimeout);
+        webWarehouseSaveTimeout = null;
+    }
+
+    const targetTownEl = document.getElementById('transferTargetTown');
+    const targetStreetEl = document.getElementById('transferTargetStreet');
+    const targetTown = targetTownEl ? targetTownEl.value : currentWarehouseVisualTown;
+    const targetStreet = targetStreetEl ? targetStreetEl.value : currentWarehouseVisualStreet;
+
+    const pNoteEl = document.getElementById('webWhPNote');
+    const pNote = pNoteEl ? pNoteEl.value : '';
+
+    const sourceDocId = `${currentWarehouseVisualTown}_${currentWarehouseVisualStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    const targetDocId = `${targetTown}_${targetStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+
+    const sourceNormTown = normalizeStreetName(currentWarehouseVisualTown);
+    const sourceNormStreet = normalizeStreetName(currentWarehouseVisualStreet);
+    const targetNormTown = normalizeStreetName(targetTown);
+    const targetNormStreet = normalizeStreetName(targetStreet);
+
+    let existingPumpRec = pumpRecords.find(r => r.id === targetDocId || (normalizeStreetName(r.settlementName) === targetNormTown && normalizeStreetName(r.streetName) === targetNormStreet));
+
+    const dateStr = new Date().toLocaleDateString('hu-HU', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\//g, '. ');
+    const nowTs = Date.now();
+
+    const transferType = wp.fajta || wp.type || '';
+    const transferSerial = wp.gyariSzam || wp.serial || '';
+    const transferModel = wp.tipus || wp.model || '';
+    const transferImpeller = wp.jarokerekSzam || wp.impeller || '';
+    const transferOwner = wp.tulajdonos || wp.owner || '';
+
+    const pumpPayload = {
+        settlementName: targetTown,
+        streetName: targetStreet,
+        telepules: targetTown,
+        utca: targetStreet,
+        userEmail: getLoggedInAdminEmail(),
+        userName: getLoggedInAdminName(),
+        dateString: dateStr,
+        timestamp: nowTs,
+        updatedAt: nowTs,
+        note: existingPumpRec ? (existingPumpRec.note || '') : '',
+        pump1State: existingPumpRec ? (existingPumpRec.pump1State || 0) : 0,
+        pump1Type: existingPumpRec ? (existingPumpRec.pump1Type || '') : '',
+        pump1Serial: existingPumpRec ? (existingPumpRec.pump1Serial || '') : '',
+        pump1Model: existingPumpRec ? (existingPumpRec.pump1Model || '') : '',
+        pump1Impeller: existingPumpRec ? (existingPumpRec.pump1Impeller || '') : '',
+        pump1Owner: existingPumpRec ? (existingPumpRec.pump1Owner || '') : '',
+        pump2State: existingPumpRec ? (existingPumpRec.pump2State || 0) : 0,
+        pump2Type: existingPumpRec ? (existingPumpRec.pump2Type || '') : '',
+        pump2Serial: existingPumpRec ? (existingPumpRec.pump2Serial || '') : '',
+        pump2Model: existingPumpRec ? (existingPumpRec.pump2Model || '') : '',
+        pump2Impeller: existingPumpRec ? (existingPumpRec.pump2Impeller || '') : '',
+        pump2Owner: existingPumpRec ? (existingPumpRec.pump2Owner || '') : ''
+    };
+
+    if (targetPos === 1) {
+        pumpPayload.pump1State = 1; // ● Üzemel
+        pumpPayload.pump1Type = transferType;
+        pumpPayload.pump1Serial = transferSerial;
+        pumpPayload.pump1Model = transferModel;
+        pumpPayload.pump1Impeller = transferImpeller;
+        pumpPayload.pump1Owner = transferOwner;
+    } else {
+        pumpPayload.pump2State = 1; // ● Üzemel
+        pumpPayload.pump2Type = transferType;
+        pumpPayload.pump2Serial = transferSerial;
+        pumpPayload.pump2Model = transferModel;
+        pumpPayload.pump2Impeller = transferImpeller;
+        pumpPayload.pump2Owner = transferOwner;
+    }
+
+    // 1. Update operational pump record locally
+    if (existingPumpRec) {
+        const idx = pumpRecords.findIndex(r => r.id === existingPumpRec.id);
+        if (idx >= 0) pumpRecords[idx] = { ...pumpRecords[idx], ...pumpPayload };
+    } else {
+        pumpRecords.unshift({ id: targetDocId, ...pumpPayload });
+    }
+
+    // 2. Clear source warehouse pump
+    if (pumpIdx === 0 && currentWarehousePumps.length === 1) {
+        currentWarehousePumps[0] = {
+            state: 0,
+            active: false,
+            type: '', fajta: '',
+            serial: '', gyariSzam: '',
+            model: '', tipus: '',
+            impeller: '', jarokerekSzam: '',
+            owner: '', tulajdonos: ''
+        };
+    } else {
+        currentWarehousePumps.splice(pumpIdx, 1);
+        if (currentWarehousePumps.length === 0) {
+            currentWarehousePumps = [{
+                state: 0, active: false,
+                type: '', fajta: '', serial: '', gyariSzam: '',
+                model: '', tipus: '', impeller: '', jarokerekSzam: '', owner: '', tulajdonos: ''
+            }];
+        }
+    }
+
+    const normalizedWarehousePumps = currentWarehousePumps.map(p => ({
+        active: Number(p.state) === 1 || Boolean(p.active),
+        state: (Number(p.state) === 1 || Boolean(p.active)) ? 1 : 0,
+        fajta: p.fajta || p.type || '',
+        type: p.fajta || p.type || '',
+        gyariSzam: p.gyariSzam || p.serial || '',
+        serial: p.gyariSzam || p.serial || '',
+        tipus: p.tipus || p.model || '',
+        model: p.tipus || p.model || '',
+        jarokerekSzam: p.jarokerekSzam || p.impeller || '',
+        impeller: p.jarokerekSzam || p.impeller || '',
+        tulajdonos: p.tulajdonos || p.owner || '',
+        owner: p.tulajdonos || p.owner || ''
+    }));
+
+    const warehousePayload = {
+        telepules: currentWarehouseVisualTown,
+        utca: currentWarehouseVisualStreet,
+        settlementName: currentWarehouseVisualTown,
+        streetName: currentWarehouseVisualStreet,
+        pumps: normalizedWarehousePumps,
+        megjegyzes: pNote,
+        note: pNote,
+        dateString: dateStr,
+        userEmail: getLoggedInAdminEmail(),
+        userName: getLoggedInAdminName(),
+        updatedAt: nowTs,
+        timestamp: nowTs
+    };
+
+    const existingWhIdx = pumpWarehouseRecords.findIndex(r => r.id === sourceDocId || (normalizeStreetName(r.settlementName) === sourceNormTown && normalizeStreetName(r.streetName) === sourceNormStreet));
+    if (existingWhIdx >= 0) {
+        pumpWarehouseRecords[existingWhIdx] = { ...pumpWarehouseRecords[existingWhIdx], ...warehousePayload, id: sourceDocId };
+    } else {
+        pumpWarehouseRecords.unshift({ id: sourceDocId, ...warehousePayload });
+    }
+
+    // 3. Save both to Firestore immediately
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            db.collection("pump_records").doc(targetDocId).set(pumpPayload, { merge: true });
+            db.collection("pump_warehouse").doc(sourceDocId).set(warehousePayload);
+            console.log("✔ Transferred pump to target & saved source warehouse:", targetDocId, sourceDocId);
+        } catch (err) {
+            console.error("❌ Transfer Firestore save error:", err);
+        }
+    }
+
+    // 4. Update UI
+    closeTransferPumpModal();
+    renderWarehouseCardDOM(pNote);
+    renderPumpWarehouseTable();
+    renderPumpTable();
+
+    alert(`Sikeresen átvíve ide: ${targetTown} • ${targetStreet} (${targetPos}. sz. szivattyú)!`);
+}
+
 function renderWarehouseCardDOM(pNote) {
     const visualContainer = document.getElementById('pumpWarehouseVisualContainer');
     if (!visualContainer) return;
@@ -2350,7 +3008,7 @@ function renderWarehouseCardDOM(pNote) {
                     <label class="pump-field-label">Járókerék száma</label>
                     <input type="text" id="webWhImpeller_${idx}" value="${p.jarokerekSzam || p.impeller || ''}" oninput="saveCurrentWarehousePump(false)" placeholder="" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box;">
                 </div>
-                <div style="text-align: left;">
+                <div style="text-align: left; margin-bottom: 12px;">
                     <label class="pump-field-label">Tulajdonos</label>
                     <select id="webWhOwner_${idx}" onchange="saveCurrentWarehousePump(false)" style="width: 100%; padding: 10px 12px; border-radius: 10px; border: 1px solid #cbd5e1; font-size: 14px; outline: none; box-sizing: border-box; background: #ffffff; color: #0f172a; font-weight: 600;">
                         ${ownerOptionsHTML}
@@ -2371,14 +3029,17 @@ function renderWarehouseCardDOM(pNote) {
             </div>
 
             <div style="padding: 20px;">
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
-                    ${cardsHTML}
+                <div style="display: flex; gap: 10px; width: 100%; margin-bottom: 16px;">
+                    <button onclick="addWarehousePumpCard()" class="custom-tooltip-btn" data-tooltip="Újabb tartalék szivattyú kártya hozzáadása ehhez az átemelőhöz (2. sz., 3. sz., stb.)." style="flex: 1; background: #1e293b; color: #38bdf8; border: 1px solid #38bdf8; padding: 10px 14px; border-radius: 10px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; transition: all 0.2s; position: relative;">
+                        + További tartalék szivattyú
+                    </button>
+                    <button onclick="promptTransferWarehousePump()" class="custom-tooltip-btn green-tooltip-btn" data-tooltip="A raktári szivattyú adatainak átvitele az üzemi Szivattyú Nyilvántartásba (kiválasztható település, utca és 1./2. szivattyú helyére), a raktári mezők egyidejű kiürítésével." style="flex: 1; background: #064e3b; color: #34d399; border: 1px solid #10b981; padding: 10px 14px; border-radius: 10px; font-weight: bold; font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 6px; box-sizing: border-box; transition: all 0.2s; position: relative;" onmouseover="this.style.background='#047857'" onmouseout="this.style.background='#064e3b'">
+                        ⇄ Beépítés a Szivattyúkhoz
+                    </button>
                 </div>
 
-                <div style="margin-top: 16px; text-align: center;">
-                    <button onclick="addWarehousePumpCard()" style="background: #0284c7; color: white; border: none; padding: 10px 20px; border-radius: 10px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 6px;">
-                        ➕ Új tartalék szivattyú hozzáadása
-                    </button>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px;">
+                    ${cardsHTML}
                 </div>
 
                 <div class="pump-note-box" style="margin-top: 16px; border-radius: 14px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
@@ -2393,7 +3054,7 @@ function renderWarehouseCardDOM(pNote) {
 function renderPumpWarehouseTable() {
     const tbody = document.getElementById('pumpWarehouseTableBody');
     const plantFilter = document.getElementById('pumpWarehousePlantFilter') ? document.getElementById('pumpWarehousePlantFilter').value : 'ALL';
-    const statusFilter = document.getElementById('pumpWarehouseStatusFilter') ? document.getElementById('pumpWarehouseStatusFilter').value : 'ALL';
+    const statusFilter = selectedPumpWarehouseStatusValue || 'ALL';
     const searchQuery = document.getElementById('pumpWarehouseSearch') ? document.getElementById('pumpWarehouseSearch').value.trim().toLowerCase() : '';
     const pageSizeVal = document.getElementById('pumpWarehousePageSize') ? document.getElementById('pumpWarehousePageSize').value : '25';
 
@@ -2406,7 +3067,7 @@ function renderPumpWarehouseTable() {
     let allRows = [];
 
     townsToInclude.forEach(town => {
-        const streets = (streetMapData[town] || []).slice().sort((a, b) => a.localeCompare(b, 'hu'));
+        const streets = streetMapData[town] || [];
         streets.forEach(street => {
             const normTown = normalizeStreetName(town);
             const normStreet = normalizeStreetName(street);
@@ -2495,7 +3156,7 @@ function renderPumpWarehouseTable() {
         };
         row.innerHTML = `
             <td><strong>${item.dateString}</strong></td>
-            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">📦 ${item.town}</span></td>
+            <td><span class="settlement-badge">${item.town}</span></td>
             <td><strong>${item.street}</strong></td>
             <td>${item.statusBadge}</td>
             <td style="font-size: 13px; font-weight: 500;">${item.pumpsSummary}</td>
@@ -2504,6 +3165,8 @@ function renderPumpWarehouseTable() {
         `;
         tbody.appendChild(row);
     });
+
+    applySavedColumnConfigToTable('bviz_cols_raktar');
 }
 
 function exportWarehouseToExcel() {
@@ -2620,8 +3283,8 @@ function exportWarehouseToExcel() {
 }
 
 function normalizeStreetName(str) {
-    if (!str) return '';
-    return str.toString()
+    if (str === undefined || str === null) return '';
+    return String(str)
         .trim()
         .toLowerCase()
         .replace(/_/g, ' ')
@@ -2630,240 +3293,690 @@ function normalizeStreetName(str) {
 }
 
 function updateMonthlyProgressSummaryWeb() {
-    const leolvasottEl = document.getElementById('leolvasott-count');
-    const osszesEl = document.getElementById('osszes-count');
-    const hatralevoContainer = document.getElementById('hatralevo-container');
-    const progressBar = document.getElementById('haviProgressBar');
+    try {
+        const leolvasottEl = document.getElementById('leolvasott-count');
+        const osszesEl = document.getElementById('osszes-count');
+        const hatralevoContainer = document.getElementById('hatralevo-container');
+        const progressBar = document.getElementById('haviProgressBar');
 
-    if (!leolvasottEl || !osszesEl || !hatralevoContainer) return;
+        if (!leolvasottEl || !osszesEl || !hatralevoContainer) return;
 
-    let totalMeters = 0;
-    let recordedMeters = 0;
+        let totalMeters = 0;
+        let recordedMeters = 0;
 
-    const towns = Object.keys(streetMapData);
-    towns.forEach(town => {
-        const streets = streetMapData[town] || [];
-        const normTown = normalizeStreetName(town);
+        ensureStreetMapDataIntegrity();
+        const towns = Object.keys(streetMapData);
+        towns.forEach(town => {
+            const streets = streetMapData[town] || [];
+            const normTown = normalizeStreetName(town);
 
-        streets.forEach(street => {
-            const normStreet = normalizeStreetName(street);
-            totalMeters++;
+            streets.forEach(street => {
+                const normStreet = normalizeStreetName(street);
+                totalMeters++;
 
-            const sameMeterReadings = electricityReadings.filter(r =>
-                normalizeStreetName(r.settlementName) === normTown &&
-                normalizeStreetName(r.meterName) === normStreet
-            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+                const sameMeterReadings = (electricityReadings || []).filter(r =>
+                    r &&
+                    normalizeStreetName(r.settlementName) === normTown &&
+                    normalizeStreetName(r.meterName) === normStreet
+                ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
 
-            const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
+                const latestReading = sameMeterReadings.length > 0 ? sameMeterReadings[0] : null;
+                const parsedDay = parseKwhValue(latestReading ? latestReading.dayKwh : null);
 
-            if (latestReading && latestReading.dayKwh > 0) {
-                recordedMeters++;
-            }
+                if (parsedDay !== null && parsedDay > 0) {
+                    recordedMeters++;
+                }
+            });
         });
-    });
 
-    const remainingMeters = Math.max(0, totalMeters - recordedMeters);
-    const progressPercent = totalMeters > 0 ? Math.min(100, Math.round((recordedMeters / totalMeters) * 100)) : 0;
+        const remainingMeters = Math.max(0, totalMeters - recordedMeters);
+        const progressPercent = totalMeters > 0 ? Math.min(100, Math.round((recordedMeters / totalMeters) * 100)) : 0;
 
-    leolvasottEl.textContent = recordedMeters;
-    osszesEl.textContent = totalMeters;
+        leolvasottEl.textContent = recordedMeters;
+        osszesEl.textContent = totalMeters;
 
-    if (remainingMeters === 0 && totalMeters > 0) {
-        hatralevoContainer.innerHTML = '<span style="background: #15803d; color: #ffffff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">Kész!</span>';
-    } else {
-        hatralevoContainer.innerHTML = `Még <span id="hatralevo-count" style="color: #80deea; font-weight: bold;">${remainingMeters}</span> db`;
-    }
+        if (remainingMeters === 0 && totalMeters > 0) {
+            hatralevoContainer.innerHTML = '<span style="background: #15803d; color: #ffffff; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: bold;">Kész!</span>';
+        } else {
+            hatralevoContainer.innerHTML = `Még <span id="hatralevo-count" style="color: #80deea; font-weight: bold;">${remainingMeters}</span> db`;
+        }
 
-    if (progressBar) {
-        progressBar.style.width = `${progressPercent}%`;
+        if (progressBar) {
+            progressBar.style.width = `${progressPercent}%`;
+        }
+    } catch (err) {
+        console.warn("Hiba updateMonthlyProgressSummaryWeb számításakor:", err);
     }
 }
 
 function renderTable() {
-    const tbody = document.getElementById('readingsTableBody');
-    const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
-    const searchQuery = document.getElementById('electricitySearch') ? document.getElementById('electricitySearch').value.trim().toLowerCase() : '';
-    const pageSizeVal = document.getElementById('electricityPageSize') ? document.getElementById('electricityPageSize').value : 'ALL';
+    try {
+        ensureStreetMapDataIntegrity();
+        const tbody = document.getElementById('readingsTableBody');
+        const plantFilter = document.getElementById('plantFilter') ? document.getElementById('plantFilter').value : 'ALL';
+        const statusFilter = document.getElementById('electricityStatusFilter') ? document.getElementById('electricityStatusFilter').value : 'ALL';
+        const searchQuery = document.getElementById('electricitySearch') ? String(document.getElementById('electricitySearch').value ?? '').trim().toLowerCase() : '';
+        const pageSizeVal = document.getElementById('electricityPageSize') ? document.getElementById('electricityPageSize').value : 'ALL';
 
-    if (!tbody) return;
-    tbody.innerHTML = '';
+        if (!tbody) return;
+        tbody.innerHTML = '';
 
-    const townsToInclude = plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter];
-    let allElecRows = [];
+        const townsToInclude = plantFilter === 'ALL' ? Object.keys(streetMapData) : [plantFilter];
+        let allElecRows = [];
 
-    townsToInclude.forEach(town => {
-        const streets = streetMapData[town] || [];
-        streets.forEach(street => {
-            const normTown = normalizeStreetName(town);
-            const normStreet = normalizeStreetName(street);
+        townsToInclude.forEach(town => {
+            const streets = streetMapData[town] || [];
+            streets.forEach(street => {
+                try {
+                    const normTown = normalizeStreetName(town);
+                    const normStreet = normalizeStreetName(street);
 
-            const sameMeterReadings = electricityReadings.filter(r =>
-                normalizeStreetName(r.settlementName) === normTown &&
-                normalizeStreetName(r.meterName) === normStreet
-            ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+                    const sameMeterReadings = (electricityReadings || []).filter(r =>
+                        r &&
+                        normalizeStreetName(r.settlementName) === normTown &&
+                        normalizeStreetName(r.meterName) === normStreet
+                    ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
 
-            const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-            const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !r.id.startsWith("hist_")) || sameMeterReadings[0] || null;
+                    const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+                    const primaryReading = sameMeterReadings.find(r => r.id === fixedDocId || !String(r.id ?? '').startsWith("hist_")) || sameMeterReadings[0] || null;
 
-            let prevKwhText = '-';
-            let currKwhText = '-';
-            let diffBadge = '<span style="color:#94a3b8;">-</span>';
-            let dateStr = '2026. 11. 11.';
-            let uploaderName = 'Rendszer';
-            let noteText = '-';
-            let docId = fixedDocId;
+                    let prevKwhNum = null;
+                    let currKwhNum = null;
+                    let prevKwhText = '—';
+                    let currKwhText = '—';
+                    let diffBadge = '<span style="color:#94a3b8; font-weight:500;">—</span>';
+                    let diffStatus = 'NONE';
+                    let dateStr = '2026. 11. 11.';
+                    let uploaderName = 'Rendszer';
+                    let noteText = '—';
+                    let docId = fixedDocId;
 
-            if (primaryReading) {
-                dateStr = primaryReading.dateString || '2026. 11. 11.';
-                noteText = primaryReading.note || noteText;
-                docId = primaryReading.id;
+                    if (primaryReading) {
+                        dateStr = String(primaryReading.dateString || '2026. 11. 11.').trim();
+                        noteText = String(primaryReading.note || '—').trim();
+                        docId = primaryReading.id || fixedDocId;
 
-                if (primaryReading.userName && primaryReading.userName.trim() !== '') {
-                    uploaderName = primaryReading.userName;
-                }
-
-                // Baseline previous reading (Explicit prevDayKwh only)
-                const baselinePrev = (primaryReading.prevDayKwh && primaryReading.prevDayKwh > 0)
-                    ? primaryReading.prevDayKwh
-                    : null;
-
-                if (baselinePrev !== null && baselinePrev > 0) {
-                    prevKwhText = `${Math.round(baselinePrev)} kWh`;
-                } else {
-                    prevKwhText = '-';
-                }
-
-                if (primaryReading.dayKwh > 0) {
-                    currKwhText = `${Math.round(primaryReading.dayKwh)} kWh`;
-
-                    if (baselinePrev !== null && baselinePrev > 0) {
-                        const diff = primaryReading.dayKwh - baselinePrev;
-                        if (diff >= 0) {
-                            diffBadge = `<span style="background: #dcfce7; color: #15803d; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block;">▲ +${Math.round(diff)} kWh</span>`;
-                        } else {
-                            diffBadge = `<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block;">▼ ${Math.round(diff)} kWh</span>`;
+                        if (primaryReading.userName && String(primaryReading.userName).trim() !== '') {
+                            uploaderName = String(primaryReading.userName).trim();
                         }
-                    } else {
-                        diffBadge = '<span style="color:#94a3b8;">-</span>';
-                    }
-                } else {
-                    currKwhText = '-';
-                    diffBadge = '<span style="color:#94a3b8;">-</span>';
-                }
-            }
 
-            allElecRows.push({
-                id: docId,
-                settlementName: town,
-                meterName: street,
-                dateString: dateStr,
-                prevKwhText: prevKwhText,
-                currKwhText: currKwhText,
-                diffBadge: diffBadge,
-                userName: uploaderName,
-                note: noteText
+                        // Parse previous reading safely
+                        const rawPrev = (primaryReading.prevDayKwh !== undefined && primaryReading.prevDayKwh !== null)
+                            ? primaryReading.prevDayKwh
+                            : (primaryReading.elozoOraallas !== undefined && primaryReading.elozoOraallas !== null ? primaryReading.elozoOraallas : null);
+                        const parsedPrev = parseKwhValue(rawPrev);
+                        if (parsedPrev !== null && parsedPrev > 0) {
+                            prevKwhNum = Math.round(parsedPrev);
+                            prevKwhText = `${prevKwhNum} kWh`;
+                        }
+
+                        // Parse current reading safely
+                        const rawCurr = (primaryReading.dayKwh !== undefined && primaryReading.dayKwh !== null)
+                            ? primaryReading.dayKwh
+                            : (primaryReading.oraallas !== undefined && primaryReading.oraallas !== null ? primaryReading.oraallas : (primaryReading.kwh !== undefined ? primaryReading.kwh : null));
+                        const parsedCurr = parseKwhValue(rawCurr);
+                        if (parsedCurr !== null && parsedCurr > 0) {
+                            currKwhNum = Math.round(parsedCurr);
+                            currKwhText = `${currKwhNum} kWh`;
+                        }
+
+                        // Calculate difference and status
+                        if (currKwhNum !== null && prevKwhNum !== null) {
+                            const diff = currKwhNum - prevKwhNum;
+                            if (diff > 0) {
+                                diffStatus = 'UP';
+                                diffBadge = `<span style="background: #dcfce7; color: #15803d; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block; border: 1px solid #86efac;">▲ +${Math.round(diff)} kWh</span>`;
+                            } else if (diff < 0) {
+                                diffStatus = 'DOWN';
+                                diffBadge = `<span style="background: #fee2e2; color: #b91c1c; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block; border: 1px solid #fca5a5;">▼ ${Math.round(diff)} kWh</span>`;
+                            } else {
+                                diffStatus = 'NONE';
+                                diffBadge = `<span style="background: #f1f5f9; color: #475569; font-weight: bold; padding: 3px 8px; border-radius: 6px; font-size: 12px; display: inline-block; border: 1px solid #cbd5e1;">0 kWh</span>`;
+                            }
+                        } else {
+                            diffStatus = 'NONE';
+                            diffBadge = '<span style="color:#94a3b8; font-weight:500;">—</span>';
+                        }
+                    }
+
+                    // Status filter check:
+                    // "ALL" -> Minden állapot (minden sort mutat)
+                    // "UP" -> ▲ Növekvő (pozitív különbség) (érvényes mindkettő, és aktuális > előző)
+                    // "DOWN" -> ▼ Csökkenő (negatív különbség) (érvényes mindkettő, és aktuális < előző)
+                    // "NONE" -> — Változatlan / Nincs adat (egyenlő, vagy valamelyik hiányzik)
+                    if (statusFilter === 'UP' && diffStatus !== 'UP') return;
+                    if (statusFilter === 'DOWN' && diffStatus !== 'DOWN') return;
+                    if (statusFilter === 'NONE' && diffStatus !== 'NONE') return;
+
+                    const historyCount = (electricityReadings || []).filter(r =>
+                        r &&
+                        String(r.id ?? '').startsWith("hist_") &&
+                        normalizeStreetName(r.settlementName) === normTown &&
+                        normalizeStreetName(r.meterName) === normStreet &&
+                        ((parseKwhValue(r.dayKwh) !== null && parseKwhValue(r.dayKwh) > 0) || (parseKwhValue(r.prevDayKwh) !== null && parseKwhValue(r.prevDayKwh) > 0))
+                    ).length;
+
+                    allElecRows.push({
+                        id: docId,
+                        settlementName: town,
+                        meterName: street,
+                        dateString: dateStr,
+                        prevKwhText: prevKwhText,
+                        currKwhText: currKwhText,
+                        diffBadge: diffBadge,
+                        userName: uploaderName,
+                        note: noteText,
+                        historyCount: historyCount
+                    });
+                } catch (rowProcErr) {
+                    console.error("Hiba sor adatfeldolgozásánál:", rowProcErr, town, street);
+                    allElecRows.push({
+                        id: `elec_${town}_${street}`,
+                        settlementName: town,
+                        meterName: street,
+                        dateString: '2026. 11. 11.',
+                        prevKwhText: '—',
+                        currKwhText: '—',
+                        diffBadge: '<span style="color:#94a3b8; font-weight:500;">—</span>',
+                        userName: 'Rendszer',
+                        note: '—',
+                        historyCount: 0
+                    });
+                }
             });
         });
-    });
 
-    if (searchQuery) {
-        allElecRows = allElecRows.filter(r =>
-            (r.settlementName || '').toLowerCase().includes(searchQuery) ||
-            (r.meterName || '').toLowerCase().includes(searchQuery) ||
-            (r.userName || '').toLowerCase().includes(searchQuery) ||
-            (r.prevKwhText || '').toLowerCase().includes(searchQuery) ||
-            (r.currKwhText || '').toLowerCase().includes(searchQuery) ||
-            (r.dateString || '').toLowerCase().includes(searchQuery) ||
-            (r.note || '').toLowerCase().includes(searchQuery)
+        if (searchQuery) {
+            allElecRows = allElecRows.filter(r =>
+                String(r.settlementName ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.meterName ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.userName ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.prevKwhText ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.currKwhText ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.dateString ?? '').toLowerCase().includes(searchQuery) ||
+                String(r.note ?? '').toLowerCase().includes(searchQuery)
+            );
+        }
+
+        const totalCount = allElecRows.length;
+        const { startIndex, endIndex, validPage } = buildPaginationControls(
+            'electricityPaginationControls',
+            'electricitySummaryCount',
+            currentElectricityPage,
+            totalCount,
+            pageSizeVal,
+            (newPage) => {
+                currentElectricityPage = newPage;
+                renderTable();
+            },
+            'bejegyzés'
         );
-    }
+        currentElectricityPage = validPage;
 
-    const totalCount = allElecRows.length;
-    const { startIndex, endIndex, validPage } = buildPaginationControls(
-        'electricityPaginationControls',
-        'electricitySummaryCount',
-        currentElectricityPage,
-        totalCount,
-        pageSizeVal,
-        (newPage) => {
-            currentElectricityPage = newPage;
-            renderTable();
-        },
-        'bejegyzés'
-    );
-    currentElectricityPage = validPage;
+        const displayList = allElecRows.slice(startIndex, endIndex);
 
-    const displayList = allElecRows.slice(startIndex, endIndex);
+        if (displayList.length === 0) {
+            const row = document.createElement('tr');
+            row.innerHTML = `<td colspan="9" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Még nincs rögzített leolvasási adat ehhez a szűréshez.</td>`;
+            tbody.appendChild(row);
+            return;
+        }
 
-    if (displayList.length === 0) {
-        const row = document.createElement('tr');
-        row.innerHTML = `<td colspan="9" style="text-align: center; color: #64748b; padding: 24px; font-size: 14px;">Még nincs rögzített leolvasási adat ehhez a szűréshez.</td>`;
-        tbody.appendChild(row);
-        return;
-    }
-
-    displayList.forEach((item) => {
-        const row = document.createElement('tr');
-        row.style.cursor = 'grab';
-        row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
-        row.draggable = true;
-
-        row.ondragstart = (e) => {
-            e.dataTransfer.setData('text/plain', JSON.stringify({ town: item.settlementName, street: item.meterName }));
-            row.style.opacity = '0.5';
-            row.style.background = '#e0f2fe';
-        };
-
-        row.ondragend = () => {
-            row.style.opacity = '1.0';
-            row.style.background = '';
-        };
-
-        row.ondragover = (e) => {
-            e.preventDefault();
-            row.style.borderTop = '3px solid #0077b6';
-        };
-
-        row.ondragleave = () => {
-            row.style.borderTop = '';
-        };
-
-        row.ondrop = (e) => {
-            e.preventDefault();
-            row.style.borderTop = '';
+        displayList.forEach((item) => {
             try {
-                const data = JSON.parse(e.dataTransfer.getData('text/plain'));
-                if (data.town === item.settlementName && data.street !== item.meterName) {
-                    reorderStreetInTown(data.town, data.street, item.meterName);
+                const row = document.createElement('tr');
+                row.style.cursor = 'grab';
+                row.title = 'Dupla kattintással szerkesztheted az adatokat | Nyomvatartással húzhatod fel-le a sorrend megváltoztatásához!';
+                row.draggable = true;
+
+                row.ondragstart = (e) => {
+                    try {
+                        e.dataTransfer.setData('text/plain', JSON.stringify({ town: item.settlementName, street: item.meterName }));
+                        row.style.opacity = '0.5';
+                        row.style.background = '#e0f2fe';
+                    } catch (dragErr) {}
+                };
+
+                row.ondragend = () => {
+                    row.style.opacity = '1.0';
+                    row.style.background = '';
+                };
+
+                row.ondragover = (e) => {
+                    e.preventDefault();
+                    row.style.borderTop = '3px solid #0077b6';
+                };
+
+                row.ondragleave = () => {
+                    row.style.borderTop = '';
+                };
+
+                row.ondrop = (e) => {
+                    e.preventDefault();
+                    row.style.borderTop = '';
+                    try {
+                        const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+                        if (data.town === item.settlementName && data.street !== item.meterName) {
+                            reorderStreetInTown(data.town, data.street, item.meterName);
+                        }
+                    } catch (err) {}
+                };
+
+                row.onclick = (e) => {
+                    if (e.target.closest('button') || e.target.closest('.btn-icon-history')) {
+                        return;
+                    }
+                    openEditModal(item.id);
+                };
+                const escapedTown = String(item.settlementName ?? '').replace(/'/g, "\\'");
+                const escapedStreet = String(item.meterName ?? '').replace(/'/g, "\\'");
+                row.innerHTML = `
+                    <td><strong>${String(item.dateString ?? '—')}</strong></td>
+                    <td><span class="settlement-badge">${String(item.settlementName ?? '')}</span></td>
+                    <td><strong>${String(item.meterName ?? '')}</strong></td>
+                    <td><span style="color: #64748b; font-size: 13.5px; font-weight: 600;">${String(item.prevKwhText ?? '—')}</span></td>
+                    <td><strong style="color: #0f172a; font-size: 14px;">${String(item.currKwhText ?? '—')}</strong></td>
+                    <td>${item.diffBadge || '—'}</td>
+                    <td style="color: #334155; font-size: 13px; font-weight: 500;">${String(item.note ?? '—')}</td>
+                    <td style="white-space: nowrap;"><strong style="color: #0077b6;">${String(item.userName ?? 'Rendszer')}</strong></td>
+                    <td style="text-align: center; white-space: nowrap; padding: 8px 4px;">
+                        <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-history-pill" title="Előzmények megtekintése">
+                            📄 ${item.historyCount} előzmény
+                        </button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            } catch (rowDomErr) {
+                console.error("Hiba sor kirajzolásakor:", rowDomErr, item);
+                const fallbackRow = document.createElement('tr');
+                fallbackRow.innerHTML = `
+                    <td><strong>${String(item.dateString ?? '—')}</strong></td>
+                    <td><span class="settlement-badge">${String(item.settlementName ?? '')}</span></td>
+                    <td><strong>${String(item.meterName ?? '')}</strong></td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td>—</td>
+                    <td><strong>Rendszer</strong></td>
+                    <td style="text-align: center;">—</td>
+                `;
+                tbody.appendChild(fallbackRow);
+            }
+        });
+
+        updateMonthlyProgressSummaryWeb();
+        applySavedColumnConfigToTable('bviz_cols_villany');
+    } catch (criticalErr) {
+        console.error("Kritikus hiba renderTable lefutásakor:", criticalErr);
+    }
+}
+
+function moveStreetInTown(town, street, direction) {
+    if (!town || !street || !streetMapData[town]) return;
+    const list = streetMapData[town];
+
+    const idx = list.findIndex(s => normalizeStreetName(s) === normalizeStreetName(street));
+    if (idx < 0) return;
+
+    const targetIdx = direction === 'UP' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return; // Boundary check
+
+    // Swap items in-place
+    const temp = list[idx];
+    list[idx] = list[targetIdx];
+    list[targetIdx] = temp;
+    streetMapData[town] = list;
+
+    // Save order to Firestore
+    saveStreetOrderToFirestore(town, list);
+
+    // Re-render all tables immediately
+    renderTable();
+    renderCleaningTable();
+    renderPumpTable();
+    renderPumpWarehouseTable();
+}
+
+function saveStreetOrderToFirestore(town, list) {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            const docId = `order_${town}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+            const cleanList = list.filter(s => s && s.trim().length > 0);
+
+            db.collection("custom_street_order").doc(docId).set({
+                settlementName: town,
+                streetsOrder: cleanList,
+                timestamp: Date.now()
+            }, { merge: true }).then(() => {
+                console.log("✔ Saved street order to Firestore custom_street_order:", docId, cleanList);
+            });
+        } catch (e) {
+            console.error("Firestore saveStreetOrderToFirestore error:", e);
+        }
+    }
+}
+
+let columnAlignmentActive = {};
+
+function getCurrentTableConfigKey() {
+    if (typeof currentTabName !== 'undefined' && currentTabName === 'cleaning') {
+        return (typeof cleaningViewMode !== 'undefined' && cleaningViewMode === 'overview')
+            ? 'bviz_cols_takaritas_allapot'
+            : 'bviz_cols_takaritas_naplo';
+    }
+    if (typeof currentTabName !== 'undefined' && currentTabName === 'pump') return 'bviz_cols_szivattyu';
+    if (typeof currentTabName !== 'undefined' && currentTabName === 'warehouse') return 'bviz_cols_raktar';
+    return 'bviz_cols_villany';
+}
+
+function getCurrentActiveTableInfo() {
+    const key = getCurrentTableConfigKey();
+    let table = null;
+    let headerRow = null;
+
+    if (key === 'bviz_cols_takaritas_allapot' || key === 'bviz_cols_takaritas_naplo') {
+        table = document.querySelector('#cleaningSection table.data-table');
+        headerRow = document.getElementById('cleaningTableHeaderRow');
+    } else if (key === 'bviz_cols_szivattyu') {
+        table = document.querySelector('#pumpSection table.data-table');
+        headerRow = document.getElementById('pumpTableHeaderRow') || document.querySelector('#pumpSection thead tr');
+    } else if (key === 'bviz_cols_raktar') {
+        table = document.querySelector('#pumpWarehouseSection table.data-table');
+        headerRow = document.getElementById('pumpWarehouseTableHeaderRow') || document.querySelector('#pumpWarehouseSection thead tr');
+    } else {
+        table = document.querySelector('#electricitySection table.data-table');
+        headerRow = document.getElementById('electricityTableHeaderRow') || document.querySelector('#electricitySection thead tr');
+    }
+
+    return { key, table, headerRow };
+}
+
+function getStoredColumnConfig(key) {
+    try {
+        const raw = localStorage.getItem(key);
+        return raw ? JSON.parse(raw) : null;
+    } catch (e) {
+        return null;
+    }
+}
+
+function saveStoredColumnConfig(key, config) {
+    try {
+        localStorage.setItem(key, JSON.stringify(config));
+    } catch (e) {}
+}
+
+function clearStoredColumnConfig(key) {
+    try {
+        localStorage.removeItem(key);
+    } catch (e) {}
+}
+
+function startColumnAlignment(btnEl) {
+    const { key, table, headerRow } = getCurrentActiveTableInfo();
+    if (!table || !headerRow) return;
+
+    columnAlignmentActive[key] = true;
+    updateColumnAlignmentUI(key, true);
+}
+
+function finishColumnAlignment(btnEl) {
+    const { key, table, headerRow } = getCurrentActiveTableInfo();
+    if (table && headerRow) {
+        saveCurrentTableConfig(key, table, headerRow);
+    }
+
+    columnAlignmentActive[key] = false;
+    updateColumnAlignmentUI(key, false);
+}
+
+function resetColumnAlignment(btnEl) {
+    const { key, table } = getCurrentActiveTableInfo();
+    clearStoredColumnConfig(key);
+    columnAlignmentActive[key] = false;
+
+    if (table) {
+        table.classList.remove('column-alignment-active');
+        table.style.tableLayout = '';
+    }
+
+    updateColumnAlignmentUI(key, false);
+
+    // Refresh current active table view
+    if (key.includes('takaritas')) {
+        renderCleaningTable();
+    } else if (key.includes('szivattyu')) {
+        renderPumpTable();
+    } else if (key.includes('raktar')) {
+        renderPumpWarehouseTable();
+    } else {
+        renderTable();
+    }
+}
+
+function updateColumnAlignmentUI(key, isActive) {
+    const { table, headerRow } = getCurrentActiveTableInfo();
+    if (!table || !headerRow) return;
+
+    const activeSection = table.closest('.table-card') || table.closest('div');
+    const startBtn = activeSection ? activeSection.querySelector('.btn-align-start') : null;
+    const doneBtn = activeSection ? activeSection.querySelector('.btn-align-done') : null;
+    const resetBtn = activeSection ? activeSection.querySelector('.btn-align-reset') : null;
+
+    if (isActive) {
+        if (startBtn) startBtn.style.display = 'none';
+        if (doneBtn) doneBtn.style.display = 'inline-flex';
+        if (resetBtn) resetBtn.style.display = 'inline-flex';
+
+        table.classList.add('column-alignment-active');
+        setupHeaderResizeAndDrag(key, table, headerRow);
+    } else {
+        if (startBtn) startBtn.style.display = 'inline-flex';
+        if (doneBtn) doneBtn.style.display = 'none';
+        if (resetBtn) resetBtn.style.display = 'none';
+
+        table.classList.remove('column-alignment-active');
+        removeHeaderResizeAndDrag(headerRow);
+    }
+}
+
+function applySavedColumnConfigToTable(key) {
+    const { table, headerRow } = getCurrentActiveTableInfo();
+    if (!table || !headerRow) return;
+
+    const config = getStoredColumnConfig(key);
+    if (!config) return;
+
+    const ths = Array.from(headerRow.children);
+    if (ths.length === 0) return;
+
+    table.style.tableLayout = 'fixed';
+
+    if (Array.isArray(config.order) && config.order.length === ths.length) {
+        const currentThsMap = {};
+        ths.forEach(th => {
+            const originalIndex = th.getAttribute('data-col-index');
+            if (originalIndex !== null) {
+                currentThsMap[originalIndex] = th;
+            }
+        });
+
+        if (Object.keys(currentThsMap).length !== ths.length) {
+            ths.forEach((th, i) => {
+                th.setAttribute('data-col-index', i);
+                currentThsMap[i] = th;
+            });
+        }
+
+        config.order.forEach(origIdx => {
+            const th = currentThsMap[origIdx];
+            if (th) headerRow.appendChild(th);
+        });
+
+        const tbody = table.querySelector('tbody');
+        if (tbody) {
+            Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+                const tds = Array.from(tr.children);
+                if (tds.length === ths.length) {
+                    const currentTdsMap = {};
+                    tds.forEach((td, i) => {
+                        const origIdx = ths[i].getAttribute('data-col-index');
+                        currentTdsMap[origIdx] = td;
+                    });
+                    config.order.forEach(origIdx => {
+                        const td = currentTdsMap[origIdx];
+                        if (td) tr.appendChild(td);
+                    });
                 }
-            } catch (err) {}
+            });
+        }
+    }
+
+    const currentThs = Array.from(headerRow.children);
+    if (Array.isArray(config.widths) && config.widths.length === currentThs.length) {
+        currentThs.forEach((th, i) => {
+            if (config.widths[i]) {
+                th.style.width = config.widths[i] + 'px';
+            }
+        });
+    }
+
+    if (columnAlignmentActive[key]) {
+        table.classList.add('column-alignment-active');
+        setupHeaderResizeAndDrag(key, table, headerRow);
+    }
+}
+
+function setupHeaderResizeAndDrag(key, table, headerRow) {
+    const ths = Array.from(headerRow.children);
+    table.style.tableLayout = 'fixed';
+
+    ths.forEach((th, i) => {
+        if (!th.hasAttribute('data-col-index')) {
+            th.setAttribute('data-col-index', i);
+        }
+
+        let handle = th.querySelector('.col-resize-handle');
+        if (!handle) {
+            handle = document.createElement('div');
+            handle.className = 'col-resize-handle';
+            th.appendChild(handle);
+        }
+
+        handle.onmousedown = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+
+            const startX = e.clientX;
+            const startWidth = th.offsetWidth;
+            handle.classList.add('resizing');
+
+            const onMouseMove = (moveEvent) => {
+                const diffX = moveEvent.clientX - startX;
+                const newWidth = Math.max(40, startWidth + diffX);
+                th.style.width = newWidth + 'px';
+            };
+
+            const onMouseUp = () => {
+                document.removeEventListener('mousemove', onMouseMove);
+                document.removeEventListener('mouseup', onMouseUp);
+                handle.classList.remove('resizing');
+                saveCurrentTableConfig(key, table, headerRow);
+            };
+
+            document.addEventListener('mousemove', onMouseMove);
+            document.addEventListener('mouseup', onMouseUp);
         };
 
-        row.onclick = (e) => {
-            if (e.target.closest('button') || e.target.closest('.btn-icon-history')) {
+        th.draggable = true;
+
+        th.ondragstart = (e) => {
+            if (e.target.classList.contains('col-resize-handle')) {
+                e.preventDefault();
                 return;
             }
-            openEditModal(item.id);
+            e.dataTransfer.setData('text/plain', i.toString());
+            th.classList.add('dragging-col');
         };
-        const escapedTown = (item.settlementName || '').replace(/'/g, "\\'");
-        const escapedStreet = (item.meterName || '').replace(/'/g, "\\'");
-        row.innerHTML = `
-            <td><strong>${item.dateString}</strong></td>
-            <td><span style="background: #e0f2fe; padding: 4px 8px; border-radius: 4px; font-weight: bold; color: #0077b6;">⚡ ${item.settlementName}</span></td>
-            <td><strong>${item.meterName}</strong></td>
-            <td><span style="color: #64748b; font-size: 14px; font-weight: 600;">${item.prevKwhText}</span></td>
-            <td><strong style="color: #0f172a; font-size: 15px;">${item.currKwhText}</strong></td>
-            <td>${item.diffBadge}</td>
-            <td style="color: #334155; font-size: 13px; font-weight: 500;">${item.note}</td>
-            <td style="white-space: nowrap;"><strong style="color: #0077b6;">${item.userName}</strong></td>
-            <td style="text-align: center; white-space: nowrap;">
-                <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-icon-history" title="Előzmények megtekintése" style="background: #e0f2fe; color: #0284c7; border: 1.5px solid #0284c7; border-radius: 8px; padding: 6px 14px; font-size: 16px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; min-width: 42px; min-height: 42px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); transition: all 0.2s ease;">📜</button>
-            </td>
-        `;
-        tbody.appendChild(row);
-    });
 
-    updateMonthlyProgressSummaryWeb();
+        th.ondragend = () => {
+            th.classList.remove('dragging-col');
+            ths.forEach(t => t.classList.remove('drag-over-col'));
+        };
+
+        th.ondragover = (e) => {
+            e.preventDefault();
+            th.classList.add('drag-over-col');
+        };
+
+        th.ondragleave = () => {
+            th.classList.remove('drag-over-col');
+        };
+
+        th.ondrop = (e) => {
+            e.preventDefault();
+            th.classList.remove('drag-over-col');
+
+            const sourceIdx = parseInt(e.dataTransfer.getData('text/plain'), 10);
+            const targetIdx = i;
+
+            if (!isNaN(sourceIdx) && sourceIdx !== targetIdx) {
+                const currentThs = Array.from(headerRow.children);
+                const sourceTh = currentThs[sourceIdx];
+                const targetTh = currentThs[targetIdx];
+
+                if (sourceTh && targetTh) {
+                    if (sourceIdx < targetIdx) {
+                        headerRow.insertBefore(sourceTh, targetTh.nextSibling);
+                    } else {
+                        headerRow.insertBefore(sourceTh, targetTh);
+                    }
+
+                    const tbody = table.querySelector('tbody');
+                    if (tbody) {
+                        Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
+                            const tds = Array.from(tr.children);
+                            const sourceTd = tds[sourceIdx];
+                            const targetTd = tds[targetIdx];
+                            if (sourceTd && targetTd) {
+                                if (sourceIdx < targetIdx) {
+                                    tr.insertBefore(sourceTd, targetTd.nextSibling);
+                                } else {
+                                    tr.insertBefore(sourceTd, targetTd);
+                                }
+                            }
+                        });
+                    }
+
+                    saveCurrentTableConfig(key, table, headerRow);
+                    setupHeaderResizeAndDrag(key, table, headerRow);
+                }
+            }
+        };
+    });
+}
+
+function removeHeaderResizeAndDrag(headerRow) {
+    if (!headerRow) return;
+    Array.from(headerRow.children).forEach(th => {
+        th.draggable = false;
+        const handle = th.querySelector('.col-resize-handle');
+        if (handle) handle.remove();
+    });
+}
+
+function saveCurrentTableConfig(key, table, headerRow) {
+    const currentThs = Array.from(headerRow.children);
+    const order = currentThs.map(th => parseInt(th.getAttribute('data-col-index'), 10));
+    const widths = currentThs.map(th => th.offsetWidth);
+
+    const config = { order, widths };
+    saveStoredColumnConfig(key, config);
+
+    const activeSection = table.closest('.table-card') || table.closest('div');
+    const resetBtn = activeSection ? activeSection.querySelector('.btn-align-reset') : null;
+    if (resetBtn) resetBtn.style.display = 'inline-flex';
 }
 
 function reorderStreetInTown(town, draggedStreet, targetStreet) {
@@ -2878,23 +3991,11 @@ function reorderStreetInTown(town, draggedStreet, targetStreet) {
         list.splice(targetIdx, 0, movedItem);
         streetMapData[town] = list;
 
+        saveStreetOrderToFirestore(town, list);
         renderTable();
-
-        if (typeof firebase !== 'undefined') {
-            try {
-                const db = firebase.firestore();
-                const docId = `order_${town}`.replace(/\s+/g, '_');
-                db.collection("custom_street_order").doc(docId).set({
-                    settlementName: town,
-                    streetsOrder: list,
-                    timestamp: Date.now()
-                }, { merge: true })
-                .then(() => console.log("Új utca sorrend elmentve a Firestore-ban:", town))
-                .catch(e => console.error("Hiba a sorrend mentésénél:", e));
-            } catch (e) {
-                console.error("Firebase save order error:", e);
-            }
-        }
+        renderCleaningTable();
+        renderPumpTable();
+        renderPumpWarehouseTable();
     }
 }
 
@@ -2962,6 +4063,131 @@ function updateDeleteCustomStreetDropdown() {
     });
 }
 
+function promptPasswordConfirmation({ title, message, onConfirm }) {
+    let modal = document.getElementById('passwordConfirmModal');
+    if (!modal) {
+        modal = document.createElement('div');
+        modal.id = 'passwordConfirmModal';
+        modal.style.cssText = 'position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.75); justify-content: center; align-items: center; z-index: 99999; backdrop-filter: blur(6px); display: none;';
+        document.body.appendChild(modal);
+    }
+
+    const modalTitle = title || "🔒 Biztonsági megerősítés szükséges";
+    const modalMessage = message || "Biztosan végrehajtod ezt a törlési műveletet?";
+
+    modal.innerHTML = `
+        <div class="visual-modal-card" style="background: #0f172a; padding: 24px; border-radius: 18px; box-shadow: 0 15px 35px rgba(0,0,0,0.5); width: 100%; max-width: 440px; text-align: center; border: 1px solid #ef4444; box-sizing: border-box; color: #ffffff;">
+            <div style="background: rgba(239, 68, 68, 0.15); width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px auto; border: 1px solid rgba(239, 68, 68, 0.4);">
+                <span style="font-size: 28px; color: #ef4444;">🔒</span>
+            </div>
+            <h3 style="font-size: 18px; font-weight: bold; margin: 0 0 8px 0; color: #ef4444;">${modalTitle}</h3>
+            <p style="font-size: 13.5px; color: #cbd5e1; margin: 0 0 18px 0; line-height: 1.5; font-weight: 500;">
+                ${modalMessage}
+            </p>
+
+            <div style="margin-bottom: 16px; text-align: left;">
+                <label style="display: block; font-size: 12px; font-weight: bold; color: #94a3b8; margin-bottom: 6px;">Jelszó megadása:</label>
+                <input type="password" id="confirmDeletePasswordInput" placeholder="Add meg a fiókod jelszavát..." style="width: 100%; padding: 12px; border-radius: 10px; border: 1px solid #334155; font-size: 14px; color: #ffffff; background: #1e293b; outline: none; box-sizing: border-box;" autocomplete="current-password">
+            </div>
+
+            <div id="confirmDeleteError" style="color: #fca5a5; font-size: 13px; font-weight: bold; margin-bottom: 16px; display: none; background: rgba(239, 68, 68, 0.2); padding: 8px 12px; border-radius: 8px; border: 1px solid #ef4444;"></div>
+
+            <div style="display: flex; gap: 12px;">
+                <button id="btnConfirmDeleteSubmit" style="flex: 1; background: #dc2626; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer; box-shadow: 0 4px 12px rgba(220,38,38,0.3);">
+                    Végleges törlés
+                </button>
+                <button id="btnConfirmDeleteCancel" style="flex: 1; background: #334155; color: white; border: none; padding: 12px; border-radius: 10px; font-size: 14px; font-weight: bold; cursor: pointer;">
+                    Mégse
+                </button>
+            </div>
+        </div>
+    `;
+
+    modal.style.display = 'flex';
+
+    const passInput = document.getElementById('confirmDeletePasswordInput');
+    const errorDiv = document.getElementById('confirmDeleteError');
+    const submitBtn = document.getElementById('btnConfirmDeleteSubmit');
+    const cancelBtn = document.getElementById('btnConfirmDeleteCancel');
+
+    if (passInput) {
+        passInput.value = '';
+        passInput.focus();
+    }
+    if (errorDiv) {
+        errorDiv.style.display = 'none';
+        errorDiv.innerText = '';
+    }
+
+    const closeSelf = () => {
+        modal.style.display = 'none';
+    };
+
+    if (cancelBtn) {
+        cancelBtn.onclick = closeSelf;
+    }
+
+    const handleConfirm = async () => {
+        const password = passInput ? passInput.value.trim() : '';
+        if (!password) {
+            if (errorDiv) {
+                errorDiv.innerText = 'Kérjük adja meg a jelszót!';
+                errorDiv.style.display = 'block';
+            }
+            return;
+        }
+
+        submitBtn.disabled = true;
+        submitBtn.innerText = 'Ellenőrzés...';
+
+        try {
+            if (typeof firebase !== 'undefined' && firebase.auth) {
+                const auth = firebase.auth();
+                const user = auth.currentUser;
+
+                if (user && user.email) {
+                    const credential = firebase.auth.EmailAuthProvider.credential(user.email, password);
+                    await user.reauthenticateWithCredential(credential);
+                } else {
+                    const loggedInEmail = getLoggedInAdminEmail();
+                    if (loggedInEmail) {
+                        await auth.signInWithEmailAndPassword(loggedInEmail, password);
+                    } else {
+                        throw new Error("Nincs bejelentkezett felhasználó");
+                    }
+                }
+            }
+
+            closeSelf();
+            if (typeof onConfirm === 'function') {
+                onConfirm();
+            }
+        } catch (err) {
+            console.warn("🔒 Password re-authentication failed:", err);
+            if (submitBtn) {
+                submitBtn.disabled = false;
+                submitBtn.innerText = 'Végleges törlés';
+            }
+            if (errorDiv) {
+                errorDiv.innerText = 'Hibás jelszó! A törlés megszakítva.';
+                errorDiv.style.display = 'block';
+            }
+        }
+    };
+
+    if (submitBtn) {
+        submitBtn.onclick = handleConfirm;
+    }
+
+    if (passInput) {
+        passInput.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                handleConfirm();
+            }
+        };
+    }
+}
+
 function executeDeleteCustomStreetFromWeb() {
     const townSelect = document.getElementById('deleteCustomTownSelect');
     const town = townSelect ? townSelect.value : 'Apaj';
@@ -2973,43 +4199,54 @@ function executeDeleteCustomStreetFromWeb() {
         return;
     }
 
-    if (confirm(`Biztosan törölni szeretnéd a(z) "${street}" átemelőt (${town}) mind az appból, mind a weboldalról?`)) {
-        if (streetMapData[town]) {
-            streetMapData[town] = streetMapData[town].filter(s => s.toLowerCase() !== street.toLowerCase());
+    promptPasswordConfirmation({
+        title: "🔒 Átemelő Végleges Törlése",
+        message: `Biztosan véglegesen törlöd a következő átemelőt?<br><strong style="color: #38bdf8;">${town} • ${street}</strong><br><small style="color: #94a3b8;">(Minden leolvasás, szivattyú és takarítási adat törlődni fog!)</small>`,
+        onConfirm: () => {
+            performDeleteCustomStreetExecution(town, street);
         }
+    });
+}
 
-        electricityReadings = electricityReadings.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.meterName || '').toLowerCase() === street.toLowerCase() ));
-        cleaningRecords = cleaningRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
-        pumpRecords = pumpRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
-
-        const docId = `${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
-        if (typeof firebase !== 'undefined') {
-            try {
-                const db = firebase.firestore();
-                db.collection("custom_streets").doc(docId).delete();
-                db.collection("pump_records").doc(docId).delete();
-                db.collection("electricity_readings").where("settlementName", "==", town).where("meterName", "==", street).get().then(snapshot => {
-                    snapshot.forEach(doc => doc.ref.delete());
-                });
-                db.collection("cleaning_records").where("settlementName", "==", town).where("streetName", "==", street).get().then(snapshot => {
-                    snapshot.forEach(doc => doc.ref.delete());
-                });
-            } catch (e) {
-                console.error("Firebase delete error:", e);
-            }
-        }
-
-        updateAddElecStreetDropdown();
-        updateAddCleanStreetDropdown();
-        updateAddPumpStreetDropdown();
-        updateDeleteCustomStreetDropdown();
-        renderTable();
-        renderCleaningTable();
-        renderPumpTable();
-
-        alert(`A(z) "${street}" átemelő (${town}) véglegesen törölve lett!`);
-        closeDeleteCustomStreetModal();
+function performDeleteCustomStreetExecution(town, street) {
+    if (streetMapData[town]) {
+        streetMapData[town] = streetMapData[town].filter(s => s.toLowerCase() !== street.toLowerCase());
     }
+
+    electricityReadings = electricityReadings.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.meterName || '').toLowerCase() === street.toLowerCase() ));
+    cleaningRecords = cleaningRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
+    pumpRecords = pumpRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
+    pumpWarehouseRecords = pumpWarehouseRecords.filter(r => !( (r.settlementName || '').toLowerCase() === town.toLowerCase() && (r.streetName || '').toLowerCase() === street.toLowerCase() ));
+
+    const docId = `${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    if (typeof firebase !== 'undefined') {
+        try {
+            const db = firebase.firestore();
+            db.collection("custom_streets").doc(docId).delete();
+            db.collection("pump_records").doc(docId).delete();
+            db.collection("pump_warehouse").doc(docId).delete();
+            db.collection("electricity_readings").where("settlementName", "==", town).where("meterName", "==", street).get().then(snapshot => {
+                snapshot.forEach(doc => doc.ref.delete());
+            });
+            db.collection("cleaning_records").where("settlementName", "==", town).where("streetName", "==", street).get().then(snapshot => {
+                snapshot.forEach(doc => doc.ref.delete());
+            });
+        } catch (e) {
+            console.error("Firebase delete error:", e);
+        }
+    }
+
+    updateAddElecStreetDropdown();
+    updateAddCleanStreetDropdown();
+    updateAddPumpStreetDropdown();
+    updateDeleteCustomStreetDropdown();
+    renderTable();
+    renderCleaningTable();
+    renderPumpTable();
+    renderPumpWarehouseTable();
+
+    alert(`A(z) "${street}" átemelő (${town}) véglegesen törölve lett!`);
+    closeDeleteCustomStreetModal();
 }
 
 function toggleCustomTownInput() {
@@ -3226,6 +4463,7 @@ function saveNewElectricityFromWeb() {
 }
 
 function openAddCleaningModal() {
+    selectCleaningStatusOption('ALL');
     updateAddCleanStreetDropdown();
     const dateEl = document.getElementById('addCleanDateString');
     if (dateEl) {
@@ -3256,6 +4494,18 @@ function saveNewCleaningFromWeb() {
         }
         if (!streetMapData[settlement]) streetMapData[settlement] = [];
         if (!streetMapData[settlement].includes(street)) streetMapData[settlement].push(street);
+
+        if (typeof firebase !== 'undefined' && firebase.firestore) {
+            try {
+                const db = firebase.firestore();
+                const customDocId = `${settlement}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+                db.collection("custom_streets").doc(customDocId).set({
+                    settlementName: settlement,
+                    streetName: street,
+                    timestamp: Date.now()
+                }, { merge: true });
+            } catch (e) {}
+        }
     }
     const dateString = document.getElementById('addCleanDateString').value.trim();
     const userName = document.getElementById('addCleanUserName').value.trim() || getLoggedInAdminName();
@@ -3274,7 +4524,7 @@ function saveNewCleaningFromWeb() {
     };
 
     cleaningRecords.unshift(newRecord);
-    renderCleaningTable();
+    selectCleaningStatusOption('ALL');
 
     if (typeof firebase !== 'undefined') {
         try {
@@ -3293,6 +4543,14 @@ function saveNewCleaningFromWeb() {
             console.error("Firebase save error:", e);
         }
     }
+
+    updateAddElecStreetDropdown();
+    updateAddCleanStreetDropdown();
+    updateAddPumpStreetDropdown();
+    renderTable();
+    renderCleaningTable();
+    renderPumpTable();
+    renderPumpWarehouseTable();
 
     closeAddCleaningModal();
 }
@@ -3554,15 +4812,79 @@ function filterHistoryModalByDate() {
     }
 }
 
+function syncPrimaryMeterPrevKwh(town, street) {
+    if (!town || !street) return;
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
+
+    // 1. Find remaining history archive records (hist_...) for this town and street, sorted newest to oldest
+    const remainingHistoryDocs = electricityReadings.filter(r =>
+        r.id.startsWith("hist_") &&
+        normalizeStreetName(r.settlementName) === normTown &&
+        normalizeStreetName(r.meterName) === normStreet &&
+        ((r.dayKwh && r.dayKwh > 0) || (r.prevDayKwh && r.prevDayKwh > 0))
+    ).sort((a, b) => (Number(b.timestamp) || 0) - (Number(a.timestamp) || 0));
+
+    // 2. Determine latest remaining previous kWh value
+    const latestHist = remainingHistoryDocs[0];
+    const newPrevKwhVal = latestHist ? ((latestHist.dayKwh && latestHist.dayKwh > 0) ? latestHist.dayKwh : (latestHist.prevDayKwh || null)) : null;
+
+    // 3. Find primary active meter record for this town and street
+    const fixedDocId = `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_');
+    let primaryIdx = electricityReadings.findIndex(r =>
+        r.id === fixedDocId ||
+        (!r.id.startsWith("hist_") && normalizeStreetName(r.settlementName) === normTown && normalizeStreetName(r.meterName) === normStreet)
+    );
+
+    if (primaryIdx >= 0) {
+        if (newPrevKwhVal !== null && newPrevKwhVal > 0) {
+            electricityReadings[primaryIdx].prevDayKwh = newPrevKwhVal;
+        } else {
+            delete electricityReadings[primaryIdx].prevDayKwh;
+        }
+    }
+
+    // 4. Update Cloud Firestore for primary active meter document
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            if (newPrevKwhVal !== null && newPrevKwhVal > 0) {
+                db.collection("electricity_readings").doc(fixedDocId).set({
+                    settlementName: town,
+                    meterName: street,
+                    telepules: town,
+                    utca: street,
+                    prevDayKwh: newPrevKwhVal,
+                    timestamp: Date.now()
+                }, { merge: true });
+            } else {
+                db.collection("electricity_readings").doc(fixedDocId).set({
+                    settlementName: town,
+                    meterName: street,
+                    telepules: town,
+                    utca: street,
+                    prevDayKwh: firebase.firestore.FieldValue.delete(),
+                    timestamp: Date.now()
+                }, { merge: true });
+            }
+        } catch (e) {
+            console.error("Firestore syncPrimaryMeterPrevKwh error:", e);
+        }
+    }
+}
+
 function deleteSingleHistoryRecord(recordId, town, street) {
     // 1. Immediately remove ONLY the selected record by recordId from local memory (0ms delay!)
     electricityReadings = electricityReadings.filter(r => r.id !== recordId);
 
-    // 2. Instantly update open history modal and main table
+    // 2. Sync primary active meter's previous kWh value
+    syncPrimaryMeterPrevKwh(town, street);
+
+    // 3. Instantly update open history modal and main table
     openHistoryModal(town, street);
     renderTable();
 
-    // 3. Delete ONLY the selected document ID from Cloud Firestore in background
+    // 4. Delete ONLY the selected document ID from Cloud Firestore in background
     if (typeof firebase !== 'undefined') {
         try {
             const db = firebase.firestore();
@@ -3631,6 +4953,7 @@ function saveNewHistoricalRecordFromWeb() {
     };
 
     electricityReadings.unshift(archivePayload);
+    syncPrimaryMeterPrevKwh(currentHistoryTown, currentHistoryStreet);
 
     if (typeof firebase !== 'undefined') {
         try {
@@ -3647,15 +4970,26 @@ function saveNewHistoricalRecordFromWeb() {
 
 function deleteAllHistoryForCurrentStreet() {
     if (!currentHistoryTown || !currentHistoryStreet) return;
-    if (!confirm(`Biztosan törölni szeretnéd a(z) ${currentHistoryTown} • ${currentHistoryStreet} ÖSSZES elmentett előzményét 1 kattintással?`)) return;
+    const town = currentHistoryTown;
+    const street = currentHistoryStreet;
 
-    const normTown = normalizeStreetName(currentHistoryTown);
-    const normStreet = normalizeStreetName(currentHistoryStreet);
+    promptPasswordConfirmation({
+        title: "🔒 Előzmények Végleges Törlése",
+        message: `Biztosan törölni szeretnéd a(z) <strong style="color: #38bdf8;">${town} • ${street}</strong> ÖSSZES elmentett előzményét 1 kattintással?`,
+        onConfirm: () => {
+            performDeleteAllHistoryForCurrentStreetExecution(town, street);
+        }
+    });
+}
+
+function performDeleteAllHistoryForCurrentStreetExecution(town, street) {
+    const normTown = normalizeStreetName(town);
+    const normStreet = normalizeStreetName(street);
 
     const historyDocs = electricityReadings.filter(r =>
         normalizeStreetName(r.settlementName) === normTown &&
         normalizeStreetName(r.meterName) === normStreet &&
-        (r.id.startsWith("hist_") || (r.id !== `elec_${currentHistoryTown}_${currentHistoryStreet}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_') && !r.id.startsWith("elec_")))
+        (r.id.startsWith("hist_") || (r.id !== `elec_${town}_${street}`.replace(/\s+/g, '_').replace(/\./g, '_').replace(/\//g, '_') && !r.id.startsWith("elec_")))
     );
 
     const idsToDelete = historyDocs.map(r => r.id);
@@ -3671,18 +5005,31 @@ function deleteAllHistoryForCurrentStreet() {
         } catch (e) {}
     }
 
-    openHistoryModal(currentHistoryTown, currentHistoryStreet);
+    syncPrimaryMeterPrevKwh(town, street);
+    openHistoryModal(town, street);
     renderTable();
-    alert(`🗑 Sikeresen 1 kattintással törölve ${idsToDelete.length} előzmény rekord!`);
+    alert(`🗑 Sikeresen törölve ${idsToDelete.length} előzmény rekord!`);
 }
 
 function deleteAllHistoryRecordsFromAllTowns() {
-    if (!confirm("⚠️ Döntő lépés! Biztosan törölni szeretnéd az ÖSSZES TELEPÜLÉS ÖSSZES UTCÁJÁNAK elmentett előzményeit egyetlen kattintással? (Az aktuális havi aktív leolvasás érintetlen marad!)")) return;
+    promptPasswordConfirmation({
+        title: "🔒 Összes Előzmény Törlése (Minden Település)",
+        message: "⚠️ Döntő lépés! Biztosan törölni szeretnéd az <strong>ÖSSZES TELEPÜLÉS ÖSSZES UTCÁJÁNAK</strong> elmentett előzményeit egyetlen kattintással?",
+        onConfirm: () => {
+            performDeleteAllHistoryRecordsFromAllTownsExecution();
+        }
+    });
+}
 
+function performDeleteAllHistoryRecordsFromAllTownsExecution() {
     const historyDocs = electricityReadings.filter(r => r.id.startsWith("hist_") || !r.id.startsWith("elec_"));
     const idsToDelete = historyDocs.map(r => r.id);
 
     electricityReadings = electricityReadings.filter(r => r.id.startsWith("elec_"));
+
+    electricityReadings.forEach(r => {
+        delete r.prevDayKwh;
+    });
 
     if (typeof firebase !== 'undefined') {
         try {
@@ -3704,6 +5051,14 @@ function deleteAllHistoryRecordsFromAllTowns() {
             if (count > 0) {
                 batch.commit();
             }
+
+            electricityReadings.forEach(r => {
+                if (r.id.startsWith("elec_")) {
+                    db.collection("electricity_readings").doc(r.id).set({
+                        prevDayKwh: firebase.firestore.FieldValue.delete()
+                    }, { merge: true });
+                }
+            });
         } catch (e) {}
     }
 
@@ -3933,6 +5288,7 @@ function saveEditHistoryRecordFromWeb() {
         } catch (e) {}
     }
 
+    syncPrimaryMeterPrevKwh(town, street);
     closeEditHistoryRecordModal();
     openHistoryModal(town, street);
     renderTable();

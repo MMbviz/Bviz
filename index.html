@@ -24,8 +24,11 @@
             background: #ffffff;
             color: #1b5e20;
             border: 2px solid #1b5e20;
-            padding: 10px 24px;
+            height: 42px;
+            box-sizing: border-box;
+            padding: 0 24px;
             border-radius: 50px;
+            font-family: inherit;
             font-size: 15px;
             font-weight: bold;
             cursor: pointer;
@@ -33,7 +36,9 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.06);
             display: inline-flex;
             align-items: center;
+            justify-content: center;
             gap: 8px;
+            white-space: nowrap;
         }
         .web-tab-button.active, .web-tab-button:hover {
             background: linear-gradient(135deg, #1b5e20, #2e7d32);
@@ -193,11 +198,20 @@
             background: #080d19 !important;
             color: #80deea !important;
             border-color: #0077b6 !important;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3) !important;
+        }
+
+        body.dark-theme .web-tab-button:hover:not(.active) {
+            background: #101929 !important;
+            border-color: #38bdf8 !important;
+            color: #ffffff !important;
         }
 
         body.dark-theme .web-tab-button.active {
             background: linear-gradient(135deg, #0077b6, #0284c7) !important;
             color: #ffffff !important;
+            border-color: #0284c7 !important;
+            box-shadow: 0 4px 14px rgba(2, 132, 199, 0.45) !important;
         }
 
         body.dark-theme div[id*="Modal"] > div {
@@ -394,65 +408,62 @@
                     <button id="webTabElectricity" class="web-tab-button active" onclick="switchWebTab('electricity')" title="Szennyvíz-átemelők havi villanyóra-állásainak, fogyasztási különbségeinek és a leolvasási ciklus előrehaladásának megtekintése.">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M11 21h-1l1-7H7.5c-.58 0-.57-.32-.38-.66L12 3h1l-1 7h4.5c.58 0 .57.32.38.66L11 21z"/></svg>Villanyórák Nyilvántartása
                     </button>
+                    <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')" title="Szennyvíz-átemelők rendszeres tisztítási, szippantási és takarítási naplójának megtekintése.">
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>Takarítási Nyilvántartás
+                    </button>
                     <button id="webTabPump" class="web-tab-button" onclick="switchWebTab('pump')" title="Átemelő-szivattyúk műszaki állapotának, gyáriszámai és karbantartási adatainak nyilvántartása.">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M22.7 19l-9.1-9.1c.9-2.3.4-5-1.5-6.9-2-2-5-2.4-7.4-1.3L9 6 6 9 1.6 4.7C.4 7.1.9 10.1 2.9 12.1c1.9 1.9 4.6 2.4 6.9 1.5l9.1 9.1c.4.4 1 .4 1.4 0l2.3-2.3c.5-.4.5-1.1.1-1.4z"/></svg>Szivattyú Nyilvántartás
                     </button>
                     <button id="webTabPumpWarehouse" class="web-tab-button" onclick="switchWebTab('pump_warehouse')" title="Szennyvíz-átemelőkhöz tartozó tartalék szivattyúk nyilvántartása a raktárban.">
                         <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M20 2H4c-1 0-2 .9-2 2v3.01c0 .72.43 1.34 1 1.69V20c0 1.1 1.1 2 2 2h14c.9 0 2-.9 2-2V8.7c.57-.35 1-.97 1-1.69V4c0-1.1-1-2-2-2zm-5 12H9v-2h6v2zm5-7H4V4h16v3z"/></svg>Szivattyú Raktár
                     </button>
-                    <button id="webTabCleaning" class="web-tab-button" onclick="switchWebTab('cleaning')" title="Szennyvíz-átemelők rendszeres tisztítási, szippantási és takarítási naplójának megtekintése.">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle; margin-right: 6px;"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>Takarítási Nyilvántartás
-                    </button>
                 </div>
                 <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                    <button id="webRolloverBtn" onclick="simulate5thRollover()" title="Havi zárás: az aktuális óraállások áthelyezése az Előző Óraállás oszlopba és az előzményekbe, majd új leolvasási ciklus indítása.">
+                    <button id="webRolloverBtn" class="top-action-btn btn-action-amber" onclick="simulate5thRollover()" title="Havi zárás: az aktuális óraállások áthelyezése az Előző Óraállás oszlopba és az előzményekbe, majd új leolvasási ciklus indítása.">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M12 4V1L8 5l4 4V6c3.31 0 6 2.69 6 6 0 1.01-.25 1.97-.7 2.8l1.46 1.46A7.93 7.93 0 0 0 20 12c0-4.42-3.58-8-8-8zm0 14c-3.31 0-6-2.69-6-6 0-1.01.25-1.97.7-2.8L5.24 7.74A7.93 7.93 0 0 0 4 12c0 4.42 3.58 8 8 8v3l4-4-4-4v3z"/></svg>Havi zárás
                     </button>
-                    <button onclick="openAddCustomStreetModal()" style="background: #0077b6; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15);" title="Új szennyvíz-átemelő (település és utca) felvétele a rendszerbe — azonnal megjelenik a weboldalon és a telefonos alkalmazásban is.">
+                    <button id="webPrimaryActionButton" class="top-action-btn btn-action-green" onclick="openAddElectricityModal()" style="display: none;" title="Új esemény rögzítése manuálisan a vezetői felületről.">
+                        ➕ Új Leolvasás
+                    </button>
+                    <button class="top-action-btn btn-action-blue" onclick="openAddCustomStreetModal()" title="Új szennyvíz-átemelő (település és utca) felvétele a rendszerbe — azonnal megjelenik a weboldalon és a telefonos alkalmazásban is.">
                         ➕ Új átemelő
                     </button>
-                    <button onclick="openDeleteCustomStreetModal()" style="background: #e53935; color: white; border: none; padding: 10px 18px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); display: inline-flex; align-items: center; gap: 6px;" title="Meglévő átemelő (utca) végleges törlése az adatbázisból és az összes nyilvántartási fülről.">
+                    <button class="top-action-btn btn-action-red" onclick="openDeleteCustomStreetModal()" title="Meglévő átemelő (utca) végleges törlése az adatbázisból és az összes nyilvántartási fülről.">
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>Átemelő törlése
                     </button>
                 </div>
             </nav>
-
-            <!-- Second Row: Left Monthly Progress Pill Badge, Right Primary Action Button -->
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px; flex-wrap: wrap; gap: 12px;">
-                <!-- Left: Compact Monthly Summary Pill Badge -->
-                <div id="havi-osszesito" class="havi-osszesito-badge">
-                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 14px; gap: 14px; flex: 1;">
-                        <div style="display: flex; align-items: center; gap: 6px;">
-                            <svg width="15" height="15" viewBox="0 0 24 24" class="havi-icon" style="vertical-align: middle;"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zM16.2 13h2.8v6h-2.8z"/></svg>
-                            <span class="havi-main-text" style="font-size: 13px; font-weight: bold;">Havi: <span id="leolvasott-count" class="count-highlight">0</span> / <span id="osszes-count" class="count-total">0</span></span>
-                        </div>
-                        <div id="hatralevo-container" class="havi-secondary-text" style="font-size: 12px; font-weight: 600;">
-                            Még <span id="hatralevo-count" class="count-remaining">0</span> db
-                        </div>
-                    </div>
-                    <!-- Bottom 3px Progress Bar -->
-                    <div class="havi-progress-track" style="width: 100%; height: 3px; overflow: hidden; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
-                        <div id="haviProgressBar" class="progress-bar-inner" style="width: 0%; height: 100%; transition: width 0.3s ease;"></div>
-                    </div>
-                </div>
-
-                <!-- Right: Primary Action Button -->
-                <button id="webPrimaryActionButton" onclick="openAddElectricityModal()" style="background: #1b5e20; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; font-size: 14px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.15); margin-left: auto;" title="Új villanyóra-állás rögzítése manuálisan a vezetői felületről — az adat azonnal frissül a rendszerben és a telefonos alkalmazásban is.">
-                    ➕ Új Leolvasás
-                </button>
-            </div>
         </div>
 
         <!-- SECTION 1: Electricity Meter Readings -->
         <div id="electricitySection">
             <div class="table-card">
                 <!-- Filter Bar -->
-                <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
-                    <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">⚡ Szennyvíz átemelők villanyóra állása</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 14px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 14px;">
+                    <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                        <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0; white-space: nowrap;">⚡ Szennyvíz átemelők villanyóra állása</h2>
+
+                        <!-- Compact Monthly Summary Pill Badge -->
+                        <div id="havi-osszesito" class="havi-osszesito-badge">
+                            <div style="display: flex; align-items: center; justify-content: space-between; padding: 0 16px; gap: 14px; flex: 1; height: 100%;">
+                                <div style="display: flex; align-items: center; gap: 6px;">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" class="havi-icon" style="vertical-align: middle;"><path d="M5 9.2h3V19H5zM10.6 5h2.8v14h-2.8zM16.2 13h2.8v6h-2.8z"/></svg>
+                                    <span class="havi-main-text" style="font-size: 14px; font-weight: 600;">Havi: <span id="leolvasott-count" class="count-highlight">0</span> / <span id="osszes-count" class="count-total">0</span></span>
+                                </div>
+                                <div id="hatralevo-container" class="havi-secondary-text" style="font-size: 13px; font-weight: 600;">
+                                    Még <span id="hatralevo-count" class="count-remaining">0</span> db
+                                </div>
+                            </div>
+                            <!-- Bottom 3px Progress Bar -->
+                            <div class="havi-progress-track" style="width: 100%; height: 3px; overflow: hidden; border-bottom-left-radius: 12px; border-bottom-right-radius: 12px;">
+                                <div id="haviProgressBar" class="progress-bar-inner" style="width: 0%; height: 100%; transition: width 0.3s ease;"></div>
+                            </div>
+                        </div>
+                    </div>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="electricitySearch" placeholder="🔍 Keresés..." onkeyup="renderTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
-                            <select id="plantFilter" onchange="renderTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
+                        <input type="text" id="electricitySearch" placeholder="🔍 Keresés..." onkeyup="renderTable()" class="filter-input">
+                        <label class="filter-label">Település:
+                            <select id="plantFilter" onchange="renderTable()" class="filter-select">
                                 <option value="ALL">Minden Település</option>
                                 <option value="Apaj">Apaj</option>
                                 <option value="Kunszentmiklós">Kunszentmiklós</option>
@@ -465,26 +476,43 @@
                                 <option value="Kunpeszér">Kunpeszér</option>
                             </select>
                         </label>
-                        <button onclick="exportToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="Valódi Excel (.xlsx) fájl letöltése az aktuálisan látható villanyóra-állásokkal: Település, Utca, Előző Óraállás és Óraállás oszlopokkal.">
-                            📄 Excel (.xlsx)
+                        <label class="filter-label">Állapot:
+                            <select id="electricityStatusFilter" onchange="renderTable()" class="filter-select">
+                                <option value="ALL">Minden állapot</option>
+                                <option value="UP">▲ Növekvő (pozitív különbség)</option>
+                                <option value="DOWN">▼ Csökkenő (negatív különbség)</option>
+                                <option value="NONE">— Változatlan / Nincs adat</option>
+                            </select>
+                        </label>
+                        <button type="button" onclick="startColumnAlignment(this)" class="btn-align-start" title="Oszlopok igazítása (szélesség és sorrend beállítása)">
+                            ↔
+                        </button>
+                        <button type="button" onclick="finishColumnAlignment(this)" class="btn-align-done" style="display: none;" title="Oszlopigazítás mentése és lezárása">
+                            ✓ Igazítás Kész
+                        </button>
+                        <button type="button" onclick="resetColumnAlignment(this)" class="btn-align-reset" style="display: none;" title="Visszaállítás az eredeti gyári oszlopsorrendre és szélességekre">
+                            ↺ Alaphelyzet
+                        </button>
+                        <button onclick="exportToExcel()" class="btn-green-dark" title="A villanyóra-állások letöltése Excel-kompatibilis CSV fájlként.">
+                            📄 Excel (.csv)
                         </button>
                     </div>
                 </div>
 
                 <!-- Data Table with Előző Óraállás column -->
-                <div class="table-wrapper" style="overflow-x: auto;">
-                    <table class="data-table" style="width: 100%; table-layout: auto;">
+                <div class="table-wrapper" style="overflow-x: hidden; width: 100%; max-width: 100%; box-sizing: border-box;">
+                    <table class="data-table" style="width: 100%; max-width: 100%; table-layout: auto; box-sizing: border-box;">
                         <thead>
-                            <tr>
-                                <th style="width: 12%;">Leolvasás Dátuma</th>
-                                <th style="width: 11%;">Település</th>
-                                <th style="width: 18%;">Utca</th>
-                                <th style="width: 11%;">Előző Óraállás</th>
-                                <th style="width: 11%;">Óraállás</th>
-                                <th style="width: 11%;">Különbség</th>
-                                <th style="width: 11%;">Megjegyzés</th>
-                                <th style="width: 10%; white-space: nowrap;">Rögzítő Neve</th>
-                                <th style="width: 5%; text-align: center;">Műveletek</th>
+                            <tr id="electricityTableHeaderRow">
+                                <th style="width: 115px; min-width: 115px;">Leolvasás Dátuma</th>
+                                <th style="width: 115px; min-width: 115px;">Település</th>
+                                <th style="width: 170px; min-width: 170px;">Utca</th>
+                                <th style="width: 110px; min-width: 110px;">Előző Óraállás</th>
+                                <th style="width: 90px; min-width: 90px;">Óraállás</th>
+                                <th style="width: 90px; min-width: 90px;">Különbség</th>
+                                <th style="width: 140px; min-width: 140px;">Megjegyzés</th>
+                                <th style="width: 120px; min-width: 120px; white-space: nowrap;">Rögzítő Neve</th>
+                                <th style="width: 125px; min-width: 125px; text-align: center;">Műveletek</th>
                             </tr>
                         </thead>
                         <tbody id="readingsTableBody">
@@ -504,6 +532,9 @@
                                 <option value="25" selected>25 sor</option>
                                 <option value="50">50 sor</option>
                                 <option value="75">75 sor</option>
+                                <option value="100">100 sor</option>
+                                <option value="125">125 sor</option>
+                                <option value="150">150 sor</option>
                             </select>
                         </label>
                     </div>
@@ -521,20 +552,20 @@
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="vertical-align: middle;"><path d="M20 8h-3V4H3c-1.1 0-2 .9-2 2v11h2c0 1.66 1.34 3 3 3s3-1.34 3-3h6c0 1.66 1.34 3 3 3s3-1.34 3-3h2v-5l-3-4zM6 18.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zm13.5-9l1.96 2.5H17V9.5h2.5zm-1.5 9c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg> Takarítási Nyilvántartás
                         </h2>
                         <!-- View Switcher Toggle Buttons -->
-                        <div style="display: flex; background: #f1f5f9; padding: 3px; border-radius: 8px; border: 1px solid #cbd5e1;" class="cleaning-view-toggle">
-                            <button id="cleaningViewOverview" onclick="currentCleaningPage=1; setCleaningViewMode('overview')" style="border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; background: #0077b6; color: #ffffff; transition: all 0.2s ease;">
+                        <div class="cleaning-view-toggle">
+                            <button id="cleaningViewOverview" onclick="currentCleaningPage=1; setCleaningViewMode('overview')" class="cleaning-toggle-btn active">
                                 Állapot áttekintő
                             </button>
-                            <button id="cleaningViewHistory" onclick="currentCleaningPage=1; setCleaningViewMode('history')" style="border: none; padding: 6px 14px; border-radius: 6px; font-size: 13px; font-weight: bold; cursor: pointer; background: transparent; color: #64748b; transition: all 0.2s ease;">
+                            <button id="cleaningViewHistory" onclick="currentCleaningPage=1; setCleaningViewMode('history')" class="cleaning-toggle-btn">
                                 Teljes előzménynapló
                             </button>
                         </div>
                     </div>
 
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="cleaningSearch" placeholder="🔍 Keresés..." onkeyup="currentCleaningPage=1; renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
-                            <select id="cleaningPlantFilter" onchange="currentCleaningPage=1; renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
+                        <input type="text" id="cleaningSearch" placeholder="🔍 Keresés..." onkeyup="currentCleaningPage=1; renderCleaningTable()" class="filter-input">
+                        <label class="filter-label">Település:
+                            <select id="cleaningPlantFilter" onchange="currentCleaningPage=1; renderCleaningTable()" class="filter-select">
                                 <option value="ALL">Minden Település</option>
                                 <option value="Apaj">Apaj</option>
                                 <option value="Kunszentmiklós">Kunszentmiklós</option>
@@ -547,15 +578,38 @@
                                 <option value="Kunpeszér">Kunpeszér</option>
                             </select>
                         </label>
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Állapot:
-                            <select id="cleaningStatusFilter" onchange="currentCleaningPage=1; renderCleaningTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
-                                <option value="ALL">Minden állapot</option>
-                                <option value="OVERDUE">Esedékes (>60 nap)</option>
-                                <option value="WARNING">Közeleg (31-60 nap)</option>
-                                <option value="OK">Rendben (0-30 nap)</option>
-                            </select>
+                        <label class="filter-label" style="display: flex; align-items: center; gap: 6px;">Állapot:
+                            <div id="cleaningCustomStatusDropdown" class="custom-dropdown" style="position: relative; display: inline-block;">
+                                <button id="cleaningCustomStatusBtn" type="button" onclick="toggleCleaningStatusDropdown(event)" class="custom-dropdown-btn">
+                                    <span id="cleaningCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
+                                    <span style="font-size: 10px; margin-left: 6px;">▼</span>
+                                </button>
+                                <div id="cleaningCustomStatusMenu" class="custom-dropdown-menu" style="min-width: max-content; white-space: nowrap;">
+                                    <div class="custom-dropdown-option" onclick="selectCleaningStatusOption('ALL')">
+                                        <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
+                                    </div>
+                                    <div class="custom-dropdown-option" onclick="selectCleaningStatusOption('OVERDUE')">
+                                        <span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; border: 1px solid #ef4444;">⚠ Esedékes (>60 nap)</span>
+                                    </div>
+                                    <div class="custom-dropdown-option" onclick="selectCleaningStatusOption('WARNING')">
+                                        <span style="background: #d97706; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; border: 1px solid #f59e0b;">⏳ Közeleg (31-60 nap)</span>
+                                    </div>
+                                    <div class="custom-dropdown-option" onclick="selectCleaningStatusOption('OK')">
+                                        <span style="background: #16a34a; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block; border: 1px solid #22c55e;">✓ Rendben (0-30 nap)</span>
+                                    </div>
+                                </div>
+                            </div>
                         </label>
-                        <button onclick="exportCleaningToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="Az átemelő-takarítási napló letöltése Excel-kompatibilis CSV fájlként.">
+                        <button type="button" onclick="startColumnAlignment(this)" class="btn-align-start" title="Oszlopok igazítása (szélesség és sorrend beállítása)">
+                            ↔
+                        </button>
+                        <button type="button" onclick="finishColumnAlignment(this)" class="btn-align-done" style="display: none;" title="Oszlopigazítás mentése és lezárása">
+                            ✓ Igazítás Kész
+                        </button>
+                        <button type="button" onclick="resetColumnAlignment(this)" class="btn-align-reset" style="display: none;" title="Visszaállítás az eredeti gyári oszlopsorrendre és szélességekre">
+                            ↺ Alaphelyzet
+                        </button>
+                        <button onclick="exportCleaningToExcel()" class="btn-green-dark" title="Az átemelő-takarítási napló letöltése Excel-kompatibilis CSV fájlként.">
                             📄 Excel (.csv)
                         </button>
                     </div>
@@ -566,13 +620,13 @@
                     <table class="data-table" style="width: 100%; table-layout: auto;">
                         <thead>
                             <tr id="cleaningTableHeaderRow">
-                                <th style="width: 13%;">Utolsó Takarítás</th>
-                                <th style="width: 14%;">Állapot</th>
+                                <th style="width: 14%;">Utolsó Takarítás</th>
                                 <th style="width: 13%;">Település</th>
                                 <th style="width: 18%;">Utca / Helyszín</th>
+                                <th style="width: 15%;">Állapot</th>
                                 <th style="width: 20%;">Megjegyzés</th>
-                                <th style="width: 14%;">Rögzítő Neve</th>
-                                <th style="width: 8%; text-align: center;">Műveletek</th>
+                                <th style="width: 13%;">Rögzítő Neve</th>
+                                <th style="width: 125px; min-width: 125px; text-align: center;">Műveletek</th>
                             </tr>
                         </thead>
                         <tbody id="cleaningTableBody">
@@ -592,6 +646,9 @@
                                 <option value="25" selected>25 sor</option>
                                 <option value="50">50 sor</option>
                                 <option value="75">75 sor</option>
+                                <option value="100">100 sor</option>
+                                <option value="125">125 sor</option>
+                                <option value="150">150 sor</option>
                             </select>
                         </label>
                     </div>
@@ -606,9 +663,9 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">🛠️ Szivattyú Nyilvántartás & Állapotok</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="pumpSearch" placeholder="🔍 Keresés..." onkeyup="currentPumpPage=1; renderPumpTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
-                            <select id="pumpPlantFilter" onchange="currentPumpPage=1; renderPumpTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
+                        <input type="text" id="pumpSearch" placeholder="🔍 Keresés..." onkeyup="currentPumpPage=1; renderPumpTable()" class="filter-input">
+                        <label class="filter-label">Település:
+                            <select id="pumpPlantFilter" onchange="currentPumpPage=1; renderPumpTable()" class="filter-select">
                                 <option value="ALL">Minden Település</option>
                                 <option value="Apaj">Apaj</option>
                                 <option value="Kunszentmiklós">Kunszentmiklós</option>
@@ -621,29 +678,38 @@
                                 <option value="Kunpeszér">Kunpeszér</option>
                             </select>
                         </label>
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 6px;">Állapot:
+                        <label class="filter-label" style="display: flex; align-items: center; gap: 6px;">Állapot:
                             <div id="pumpCustomStatusDropdown" class="custom-dropdown" style="position: relative; display: inline-block;">
                                 <button id="pumpCustomStatusBtn" type="button" onclick="togglePumpStatusDropdown(event)" class="custom-dropdown-btn">
-                                    <span id="pumpCustomStatusSelected">Minden állapot</span>
-                                    <span style="font-size: 10px; margin-left: 8px;">▼</span>
+                                    <span id="pumpCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
+                                    <span style="font-size: 10px; margin-left: 6px;">▼</span>
                                 </button>
-                                <div id="pumpCustomStatusMenu" class="custom-dropdown-menu" style="display: none;">
+                                <div id="pumpCustomStatusMenu" class="custom-dropdown-menu">
                                     <div class="custom-dropdown-option" onclick="selectPumpStatusOption('ALL')">
                                         <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     </div>
                                     <div class="custom-dropdown-option" onclick="selectPumpStatusOption('1')">
-                                        <span class="pump-pill-badge badge-working">● Üzemel</span>
+                                        <span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">• Üzemel</span>
                                     </div>
                                     <div class="custom-dropdown-option" onclick="selectPumpStatusOption('2')">
-                                        <span class="pump-pill-badge badge-faulty">● Hibás</span>
+                                        <span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">• Hibás</span>
                                     </div>
                                     <div class="custom-dropdown-option" onclick="selectPumpStatusOption('0')">
-                                        <span class="pump-pill-badge badge-none">Nincs szivattyú</span>
+                                        <span style="background: #475569; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">Nincs szivattyú</span>
                                     </div>
                                 </div>
                             </div>
                         </label>
-                        <button onclick="exportPumpToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="A szivattyú nyilvántartási adatok letöltése Excel-kompatibilis CSV fájlként.">
+                        <button type="button" onclick="startColumnAlignment(this)" class="btn-align-start" title="Oszlopok igazítása (szélesség és sorrend beállítása)">
+                            ↔
+                        </button>
+                        <button type="button" onclick="finishColumnAlignment(this)" class="btn-align-done" style="display: none;" title="Oszlopigazítás mentése és lezárása">
+                            ✓ Igazítás Kész
+                        </button>
+                        <button type="button" onclick="resetColumnAlignment(this)" class="btn-align-reset" style="display: none;" title="Visszaállítás az eredeti gyári oszlopsorrendre és szélességekre">
+                            ↺ Alaphelyzet
+                        </button>
+                        <button onclick="exportPumpToExcel()" class="btn-green-dark" title="A szivattyú nyilvántartási adatok letöltése Excel-kompatibilis CSV fájlként.">
                             📄 Excel (.csv)
                         </button>
                     </div>
@@ -658,7 +724,7 @@
                 <div class="table-wrapper" style="overflow-x: auto;">
                     <table class="data-table" style="width: 100%; table-layout: auto;">
                         <thead>
-                            <tr>
+                            <tr id="pumpTableHeaderRow">
                                 <th style="width: 12%;">Karbantartás Dátuma</th>
                                 <th style="width: 10%;">Település</th>
                                 <th style="width: 15%;">Utca</th>
@@ -685,6 +751,9 @@
                                 <option value="25" selected>25 sor</option>
                                 <option value="50">50 sor</option>
                                 <option value="75">75 sor</option>
+                                <option value="100">100 sor</option>
+                                <option value="125">125 sor</option>
+                                <option value="150">150 sor</option>
                             </select>
                         </label>
                     </div>
@@ -699,9 +768,9 @@
                 <div style="display: flex; justify-content: space-between; align-items: center; padding: 16px 20px; background: #ffffff; border-bottom: 1px solid #e2e8f0; flex-wrap: wrap; gap: 12px;">
                     <h2 style="color: #0f172a; font-weight: bold; font-size: 18px; margin: 0;">📦 Szivattyú Raktár (Tartalék Szivattyúk)</h2>
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <input type="text" id="pumpWarehouseSearch" placeholder="🔍 Keresés..." onkeyup="currentPumpWarehousePage=1; renderPumpWarehouseTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; background: #f8fafc; font-size: 14px; outline: none;">
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Település:
-                            <select id="pumpWarehousePlantFilter" onchange="currentPumpWarehousePage=1; renderPumpWarehouseTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
+                        <input type="text" id="pumpWarehouseSearch" placeholder="🔍 Keresés..." onkeyup="currentPumpWarehousePage=1; renderPumpWarehouseTable()" class="filter-input">
+                        <label class="filter-label">Település:
+                            <select id="pumpWarehousePlantFilter" onchange="currentPumpWarehousePage=1; renderPumpWarehouseTable()" class="filter-select">
                                 <option value="ALL">Minden Település</option>
                                 <option value="Apaj">Apaj</option>
                                 <option value="Kunszentmiklós">Kunszentmiklós</option>
@@ -714,14 +783,35 @@
                                 <option value="Kunpeszér">Kunpeszér</option>
                             </select>
                         </label>
-                        <label style="color: #1e293b; font-weight: 600; font-size: 14px;">Állapot:
-                            <select id="pumpWarehouseStatusFilter" onchange="currentPumpWarehousePage=1; renderPumpWarehouseTable()" style="padding: 8px 12px; border-radius: 8px; border: 1px solid #cbd5e1; font-weight: 600; color: #0f172a; background: #ffffff;">
-                                <option value="ALL">Minden állapot</option>
-                                <option value="VAN">Van</option>
-                                <option value="NINCS">Nincs</option>
-                            </select>
+                        <label class="filter-label" style="display: flex; align-items: center; gap: 6px;">Állapot:
+                            <div id="pumpWhCustomStatusDropdown" class="custom-dropdown" style="position: relative; display: inline-block;">
+                                <button id="pumpWhCustomStatusBtn" type="button" onclick="togglePumpWhStatusDropdown(event)" class="custom-dropdown-btn">
+                                    <span id="pumpWhCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
+                                    <span style="font-size: 10px; margin-left: 6px;">▼</span>
+                                </button>
+                                <div id="pumpWhCustomStatusMenu" class="custom-dropdown-menu">
+                                    <div class="custom-dropdown-option" onclick="selectPumpWhStatusOption('ALL')">
+                                        <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
+                                    </div>
+                                    <div class="custom-dropdown-option" onclick="selectPumpWhStatusOption('VAN')">
+                                        <span style="background: #15803d; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">• Van</span>
+                                    </div>
+                                    <div class="custom-dropdown-option" onclick="selectPumpWhStatusOption('NINCS')">
+                                        <span style="background: #dc2626; color: #ffffff; font-weight: 800; padding: 4px 12px; border-radius: 20px; font-size: 12px; display: inline-block;">• Nincs</span>
+                                    </div>
+                                </div>
+                            </div>
                         </label>
-                        <button onclick="exportWarehouseToExcel()" class="btn-green-dark" style="padding: 8px 16px; font-size: 14px; border-radius: 8px;" title="A raktári tartalék szivattyúk letöltése Excel-kompatibilis CSV fájlként.">
+                        <button type="button" onclick="startColumnAlignment(this)" class="btn-align-start" title="Oszlopok igazítása (szélesség és sorrend beállítása)">
+                            ↔
+                        </button>
+                        <button type="button" onclick="finishColumnAlignment(this)" class="btn-align-done" style="display: none;" title="Oszlopigazítás mentése és lezárása">
+                            ✓ Igazítás Kész
+                        </button>
+                        <button type="button" onclick="resetColumnAlignment(this)" class="btn-align-reset" style="display: none;" title="Visszaállítás az eredeti gyári oszlopsorrendre és szélességekre">
+                            ↺ Alaphelyzet
+                        </button>
+                        <button onclick="exportWarehouseToExcel()" class="btn-green-dark" title="A raktári tartalék szivattyúk letöltése Excel-kompatibilis CSV fájlként.">
                             📄 Excel (.csv)
                         </button>
                     </div>
@@ -736,7 +826,7 @@
                 <div class="table-wrapper" style="overflow-x: auto;">
                     <table class="data-table" style="width: 100%; table-layout: auto;">
                         <thead>
-                            <tr>
+                            <tr id="pumpWarehouseTableHeaderRow">
                                 <th style="width: 12%;">Frissítés Dátuma</th>
                                 <th style="width: 12%;">Település</th>
                                 <th style="width: 16%;">Utca</th>
@@ -763,6 +853,9 @@
                                 <option value="25" selected>25 sor</option>
                                 <option value="50">50 sor</option>
                                 <option value="75">75 sor</option>
+                                <option value="100">100 sor</option>
+                                <option value="125">125 sor</option>
+                                <option value="150">150 sor</option>
                             </select>
                         </label>
                     </div>
