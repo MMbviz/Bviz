@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="author" content="Mizsei Márk">
+    <meta name="author" content="Bviz Üzemeltetés">
     <title>Bviz - Vezetői irányítópult</title>
     <link rel="stylesheet" href="styles.css?v=20261120_5">
     <!-- Firebase Web SDK -->
@@ -619,7 +619,7 @@
                                     <span id="electricityCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     <span style="font-size: 10px; margin-left: 6px;">▼</span>
                                 </button>
-                                <div id="electricityCustomStatusMenu" class="custom-dropdown-menu" style="min-width: max-content; white-space: nowrap;">
+                                <div id="electricityCustomStatusMenu" class="custom-dropdown-menu" style="display: none; min-width: max-content; white-space: nowrap;">
                                     <div class="custom-dropdown-option" onclick="selectElectricityStatusOption('ALL')">
                                         <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     </div>
@@ -741,7 +741,7 @@
                                     <span id="cleaningCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     <span style="font-size: 10px; margin-left: 6px;">▼</span>
                                 </button>
-                                <div id="cleaningCustomStatusMenu" class="custom-dropdown-menu" style="min-width: max-content; white-space: nowrap;">
+                                <div id="cleaningCustomStatusMenu" class="custom-dropdown-menu" style="display: none; min-width: max-content; white-space: nowrap;">
                                     <div class="custom-dropdown-option" onclick="selectCleaningStatusOption('ALL')">
                                         <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     </div>
@@ -841,7 +841,7 @@
                                     <span id="pumpCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     <span style="font-size: 10px; margin-left: 6px;">▼</span>
                                 </button>
-                                <div id="pumpCustomStatusMenu" class="custom-dropdown-menu">
+                                <div id="pumpCustomStatusMenu" class="custom-dropdown-menu" style="display: none;">
                                     <div class="custom-dropdown-option" onclick="selectPumpStatusOption('ALL')">
                                         <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     </div>
@@ -946,7 +946,7 @@
                                     <span id="pumpWhCustomStatusSelected" style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     <span style="font-size: 10px; margin-left: 6px;">▼</span>
                                 </button>
-                                <div id="pumpWhCustomStatusMenu" class="custom-dropdown-menu">
+                                <div id="pumpWhCustomStatusMenu" class="custom-dropdown-menu" style="display: none;">
                                     <div class="custom-dropdown-option" onclick="selectPumpWhStatusOption('ALL')">
                                         <span style="font-size: 13px; font-weight: 600;">Minden állapot</span>
                                     </div>
@@ -1554,19 +1554,15 @@
             <div style="background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #e2e8f0; text-align: left; margin-bottom: 20px;" class="about-info-card">
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0;" class="about-info-row">
                     <span style="font-size: 13px; font-weight: 600; color: #64748b;" class="about-info-label">Alkalmazás neve:</span>
-                    <span style="font-size: 13px; font-weight: bold; color: #0f172a;" class="about-info-val">Bviz Üzemeltetési Rendszer</span>
-                </div>
-                <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0;" class="about-info-row">
-                    <span style="font-size: 13px; font-weight: 600; color: #64748b;" class="about-info-label">Verzió:</span>
-                    <span id="aboutVersionDisplay" style="font-size: 13px; font-weight: bold; color: #0284c7;" class="about-info-val">1.0</span>
+                    <span id="aboutAppNameDisplay" style="font-size: 13px; font-weight: bold; color: #0f172a;" class="about-info-val">Bviz Üzemeltetési Rendszer</span>
                 </div>
                 <div style="display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #e2e8f0;" class="about-info-row">
                     <span style="font-size: 13px; font-weight: 600; color: #64748b;" class="about-info-label">Fejlesztő / Készítette:</span>
-                    <span style="font-size: 13px; font-weight: bold; color: #0f172a;" class="about-info-val">Mizsei Márk (2026)</span>
+                    <span id="aboutDeveloperDisplay" style="font-size: 13px; font-weight: bold; color: #0f172a;" class="about-info-val">Bviz Üzemeltetés (2026)</span>
                 </div>
-                <div style="display: flex; justify-content: space-between; padding: 8px 0;" class="about-info-row">
+                <div id="aboutContactRow" style="display: flex; justify-content: space-between; padding: 8px 0;" class="about-info-row">
                     <span style="font-size: 13px; font-weight: 600; color: #64748b;" class="about-info-label">Kapcsolat:</span>
-                    <a href="tel:+36306915571" style="font-size: 13px; font-weight: bold; color: #0284c7; text-decoration: none;" class="about-info-link">+36306915571</a>
+                    <a id="aboutContactDisplay" href="javascript:void(0)" style="font-size: 13px; font-weight: bold; color: #0284c7; text-decoration: none;" class="about-info-link">—</a>
                 </div>
             </div>
 

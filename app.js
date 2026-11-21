@@ -104,9 +104,6 @@ function formatAdminEmail(inputName) {
 function getLoggedInAdminName() {
     if (typeof firebase !== 'undefined' && firebase.auth && firebase.auth().currentUser) {
         const email = (firebase.auth().currentUser.email || '').toLowerCase();
-        if (email.includes('mizsei')) return 'Mizsei Márk';
-        if (email.includes('ori')) return 'Őri Csaba';
-        if (email.includes('kovacs') || email.includes('peter')) return 'Kovács Péter';
         const prefix = email.split('@')[0];
         return prefix.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
     }
@@ -214,6 +211,7 @@ function handleWebLogin(event) {
             .then((userCredential) => {
                 console.log("✔ Sikeres Firebase Auth belépés!", userCredential.user?.email);
                 if (loginError) loginError.style.display = 'none';
+                ensureSystemInfoInFirestore();
             })
             .catch((error) => {
                 console.warn(`⚠️ Hiba a(z) "${currentEmail}" fiókkal: [${error.code}] ${error.message}`);
@@ -224,7 +222,7 @@ function handleWebLogin(event) {
     tryNextCandidate(0);
 }
 
-const WEB_VERSION = "4.7";
+const WEB_VERSION = "5.8";
 let cachedWebVersion = WEB_VERSION;
 
 function compareVersions(v1, v2) {
@@ -301,6 +299,77 @@ function fetchWebVersionFromFirestore() {
     }
 }
 
+let cachedSystemInfo = null;
+
+async function ensureSystemInfoInFirestore() {
+    if (typeof firebase === 'undefined' || !firebase.firestore || !firebase.auth || !firebase.auth().currentUser) {
+        return;
+    }
+
+    try {
+        const db = firebase.firestore();
+        const docRef = db.collection("settings").doc("system_info");
+        const doc = await docRef.get();
+
+        if (!doc.exists) {
+            await docRef.set({
+                appName: "Bviz Üzemeltetési Rendszer",
+                versionName: "1.0",
+                developer: "Mizsei Márk (2026)",
+                contactPhone: "+36306915571",
+                updatedAt: Date.now()
+            }, { merge: true });
+            console.log("✔ Initialized settings/system_info in Firestore!");
+        }
+
+        fetchSystemInfoFromFirestore();
+    } catch (err) {
+        console.warn("ensureSystemInfoInFirestore warning:", err);
+    }
+}
+
+function fetchSystemInfoFromFirestore() {
+    if (typeof firebase !== 'undefined' && firebase.firestore) {
+        try {
+            const db = firebase.firestore();
+            db.collection("settings").doc("system_info").onSnapshot((doc) => {
+                if (doc.exists) {
+                    cachedSystemInfo = doc.data();
+                    updateAboutModalDOM();
+                }
+            }, err => console.warn("system_info listener warning:", err));
+        } catch (e) {
+            console.warn("fetchSystemInfoFromFirestore error:", e);
+        }
+    }
+}
+
+function updateAboutModalDOM() {
+    if (!cachedSystemInfo) return;
+
+    const appNameEl = document.getElementById('aboutAppNameDisplay');
+    const versionEl = document.getElementById('aboutVersionDisplay');
+    const devEl = document.getElementById('aboutDeveloperDisplay');
+    const contactEl = document.getElementById('aboutContactDisplay');
+    const contactRowEl = document.getElementById('aboutContactRow');
+
+    if (appNameEl && cachedSystemInfo.appName) {
+        appNameEl.textContent = cachedSystemInfo.appName;
+    }
+    if (versionEl) {
+        const ver = cachedSystemInfo.versionName || (typeof cachedWebVersion !== 'undefined' ? cachedWebVersion : '1.0');
+        versionEl.textContent = ver;
+    }
+    if (devEl && cachedSystemInfo.developer) {
+        devEl.textContent = cachedSystemInfo.developer;
+    }
+    if (contactEl && cachedSystemInfo.contactPhone) {
+        contactEl.textContent = cachedSystemInfo.contactPhone;
+        contactEl.href = `tel:${cachedSystemInfo.contactPhone.replace(/\s+/g, '')}`;
+        if (contactRowEl) contactRowEl.style.display = 'flex';
+    }
+}
+
 function updateWebAboutVersionUI() {
     const verEl = document.getElementById('aboutVersionDisplay');
     if (verEl) {
@@ -310,7 +379,9 @@ function updateWebAboutVersionUI() {
 
 function openAboutModal() {
     fetchWebVersionFromFirestore();
+    fetchSystemInfoFromFirestore();
     updateWebAboutVersionUI();
+    updateAboutModalDOM();
     const modal = document.getElementById('aboutModal');
     if (modal) modal.style.display = 'flex';
 }
@@ -982,18 +1053,14 @@ function exportToExcel() {
 }
 
 function resolveDisplayName(rawName, rawEmail) {
-    if (rawName && !rawName.includes("@") && rawName.includes(" ")) {
-        return rawName;
-    } else if (rawEmail.includes("mizsei") || rawName.toLowerCase().includes("mizse")) {
-        return "Mizsei Márk";
-    } else if (rawEmail.includes("ori") || rawName.toLowerCase().includes("őri")) {
-        return "Őri Csaba";
-    } else if (rawEmail.includes("peter") || rawName.toLowerCase().includes("kovács")) {
-        return "Kovács Péter";
-    } else if (rawName && !rawName.includes("@")) {
-        return rawName;
+    if (rawName && !rawName.includes("@") && rawName.trim().length > 0) {
+        return rawName.trim();
     }
-    return "Mizsei Márk";
+    if (rawEmail) {
+        const prefix = rawEmail.split('@')[0];
+        return prefix.split('.').map(p => p.charAt(0).toUpperCase() + p.slice(1)).join(' ');
+    }
+    return 'Rendszer';
 }
 
 let cleaningViewMode = 'overview'; // 'overview' (Állapot áttekintő) or 'history' (Teljes előzménynapló)
@@ -1187,7 +1254,7 @@ function openLocationCleaningHistoryModal(groupKey, town, street) {
             };
             row.innerHTML = `
                 <td><strong>${rec.dateString}</strong></td>
-                <td><strong style="color: #0077b6; white-space: nowrap;">${rec.userName || 'Mizsei Márk'}</strong></td>
+                <td><strong style="color: #0077b6; white-space: nowrap;">${rec.userName || 'Rendszer'}</strong></td>
                 <td>${rec.note || '-'}</td>
                 <td style="text-align: center; white-space: nowrap;">
                     <button onclick="event.stopPropagation(); deleteCleaningRecordFromWeb('${rec.id}'); closeLocationCleaningHistoryModal();" class="btn-icon-delete" title="Törlés">🗑</button>
@@ -1369,7 +1436,7 @@ function renderCleaningTable() {
                 <td><strong>${loc.streetName}</strong></td>
                 <td>${getCleaningStatusBadgeHTML(loc.daysAgo)}</td>
                 <td>${loc.latestRecord.note || '-'}</td>
-                <td style="white-space: nowrap;"><strong style="color: #0077b6;">${loc.latestRecord.userName || 'Mizsei Márk'}</strong></td>
+                <td style="white-space: nowrap;"><strong style="color: #0077b6;">${loc.latestRecord.userName || 'Rendszer'}</strong></td>
                 <td style="text-align: center; white-space: nowrap; padding: 8px 4px;">
                     <button onclick="openLocationCleaningHistoryModal('${loc.key}', '${escapedTown}', '${escapedStreet}')" class="btn-history-pill" style="min-width: 115px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center;" title="Előzmények megtekintése">
                         📝 ${loc.historyRecords.length} előzmény
@@ -1449,7 +1516,7 @@ function renderCleaningTable() {
                 <td><strong>${rec.streetName || 'Helyszín'}</strong></td>
                 <td>${getCleaningStatusBadgeHTML(item.daysAgo)}</td>
                 <td>${rec.note || '-'}</td>
-                <td style="white-space: nowrap;"><strong style="color: #0077b6;">${rec.userName || 'Mizsei Márk'}</strong></td>
+                <td style="white-space: nowrap;"><strong style="color: #0077b6;">${rec.userName || 'Rendszer'}</strong></td>
                 <td style="text-align: center; white-space: nowrap;">
                     <button onclick="openCleaningEditModal('${rec.id}')" class="btn-icon-edit" title="Szerkesztés">✏️</button>
                     <button onclick="deleteCleaningRecordFromWeb('${rec.id}')" class="btn-icon-delete" title="Törlés">🗑</button>
@@ -1903,7 +1970,7 @@ function exportCleaningToExcel() {
             `"${statusText}"`,
             `"${item.settlementName || 'Apaj'}"`,
             `"${item.streetName || 'Helyszín'}"`,
-            `"${item.userName || 'Mizsei Márk'}"`,
+            `"${item.userName || 'Rendszer'}"`,
             `"${(item.note || '-').replace(/"/g, '""')}"`
         ].join(";");
 
@@ -3489,18 +3556,18 @@ function renderTable() {
 
                     let prevKwhNum = null;
                     let currKwhNum = null;
-                    let prevKwhText = '—';
-                    let currKwhText = '—';
-                    let diffBadge = '<span style="color:#94a3b8; font-weight:600;">—</span>';
+                    let prevKwhText = '-';
+                    let currKwhText = '-';
+                    let diffBadge = '<span style="color:#94a3b8; font-weight:600;">-</span>';
                     let diffStatus = 'NONE';
                     let dateStr = '2026. 11. 11.';
                     let uploaderName = 'Rendszer';
-                    let noteText = '—';
+                    let noteText = '-';
                     let docId = fixedDocId;
 
                     if (primaryReading) {
                         dateStr = String(primaryReading.dateString || '2026. 11. 11.').trim();
-                        noteText = String(primaryReading.note || '—').trim();
+                        noteText = String(primaryReading.note || '-').trim();
                         docId = primaryReading.id || fixedDocId;
 
                         if (primaryReading.userName && String(primaryReading.userName).trim() !== '') {
@@ -3542,7 +3609,7 @@ function renderTable() {
                             }
                         } else {
                             diffStatus = 'NONE';
-                            diffBadge = '<span style="color:#94a3b8; font-weight:600;">—</span>';
+                            diffBadge = '<span style="color:#94a3b8; font-weight:600;">-</span>';
                         }
                     }
 
@@ -3678,13 +3745,13 @@ function renderTable() {
                 const escapedTown = String(item.settlementName ?? '').replace(/'/g, "\\'");
                 const escapedStreet = String(item.meterName ?? '').replace(/'/g, "\\'");
                 row.innerHTML = `
-                    <td><strong>${String(item.dateString ?? '—')}</strong></td>
+                    <td><strong>${String(item.dateString ?? '-')}</strong></td>
                     <td><span class="settlement-badge">${String(item.settlementName ?? '')}</span></td>
                     <td><strong>${String(item.meterName ?? '')}</strong></td>
-                    <td><span style="color: #64748b; font-size: 13.5px; font-weight: 600;">${String(item.prevKwhText ?? '—')}</span></td>
-                    <td><strong style="color: #0f172a; font-size: 14px;">${String(item.currKwhText ?? '—')}</strong></td>
-                    <td>${item.diffBadge || '—'}</td>
-                    <td style="color: #334155; font-size: 13px; font-weight: 500;">${String(item.note ?? '—')}</td>
+                    <td><span style="color: #64748b; font-size: 13.5px; font-weight: 500;">${String(item.prevKwhText ?? '-')}</span></td>
+                    <td><strong style="color: #0f172a; font-size: 14px;">${String(item.currKwhText ?? '-')}</strong></td>
+                    <td>${item.diffBadge || '-'}</td>
+                    <td style="color: #334155; font-size: 13px; font-weight: 500;">${String(item.note ?? '-')}</td>
                     <td style="white-space: nowrap;"><strong style="color: #0077b6;">${String(item.userName ?? 'Rendszer')}</strong></td>
                     <td style="text-align: center; white-space: nowrap; padding: 8px 4px;">
                         <button onclick="event.stopPropagation(); openHistoryModal('${escapedTown}', '${escapedStreet}')" class="btn-history-pill" style="min-width: 115px; white-space: nowrap; display: inline-flex; align-items: center; justify-content: center;" title="Előzmények megtekintése">
@@ -3697,15 +3764,15 @@ function renderTable() {
                 console.error("Hiba sor kirajzolásakor:", rowDomErr, item);
                 const fallbackRow = document.createElement('tr');
                 fallbackRow.innerHTML = `
-                    <td><strong>${String(item.dateString ?? '—')}</strong></td>
+                    <td><strong>${String(item.dateString ?? '-')}</strong></td>
                     <td><span class="settlement-badge">${String(item.settlementName ?? '')}</span></td>
                     <td><strong>${String(item.meterName ?? '')}</strong></td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>—</td>
-                    <td>—</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
+                    <td>-</td>
                     <td><strong>Rendszer</strong></td>
-                    <td style="text-align: center;">—</td>
+                    <td style="text-align: center;">-</td>
                 `;
                 tbody.appendChild(fallbackRow);
             }
@@ -3892,32 +3959,41 @@ function applySavedColumnConfigToTable(key) {
     const { table, headerRow } = getCurrentActiveTableInfo();
     if (!table || !headerRow) return;
 
-    const config = getStoredColumnConfig(key);
-    if (!config) return;
-
     const ths = Array.from(headerRow.children);
     if (ths.length === 0) return;
 
-    table.style.tableLayout = 'fixed';
+    // Stamp original index if missing BEFORE DOM reordering
+    ths.forEach((th, i) => {
+        if (!th.hasAttribute('data-col-index')) {
+            th.setAttribute('data-col-index', i.toString());
+        }
+    });
+
+    const config = getStoredColumnConfig(key);
+    if (!config) {
+        if (!columnAlignmentActive[key]) {
+            table.style.tableLayout = '';
+        }
+        return;
+    }
+
+    if (columnAlignmentActive[key]) {
+        table.style.tableLayout = 'fixed';
+    } else {
+        table.style.tableLayout = '';
+    }
 
     if (Array.isArray(config.order) && config.order.length === ths.length) {
-        const currentThsMap = {};
+        const thByOrigIdx = {};
         ths.forEach(th => {
-            const originalIndex = th.getAttribute('data-col-index');
-            if (originalIndex !== null) {
-                currentThsMap[originalIndex] = th;
+            const idx = parseInt(th.getAttribute('data-col-index'), 10);
+            if (!isNaN(idx)) {
+                thByOrigIdx[idx] = th;
             }
         });
 
-        if (Object.keys(currentThsMap).length !== ths.length) {
-            ths.forEach((th, i) => {
-                th.setAttribute('data-col-index', i);
-                currentThsMap[i] = th;
-            });
-        }
-
         config.order.forEach(origIdx => {
-            const th = currentThsMap[origIdx];
+            const th = thByOrigIdx[origIdx];
             if (th) headerRow.appendChild(th);
         });
 
@@ -3926,13 +4002,8 @@ function applySavedColumnConfigToTable(key) {
             Array.from(tbody.querySelectorAll('tr')).forEach(tr => {
                 const tds = Array.from(tr.children);
                 if (tds.length === ths.length) {
-                    const currentTdsMap = {};
-                    tds.forEach((td, i) => {
-                        const origIdx = ths[i].getAttribute('data-col-index');
-                        currentTdsMap[origIdx] = td;
-                    });
                     config.order.forEach(origIdx => {
-                        const td = currentTdsMap[origIdx];
+                        const td = tds[origIdx];
                         if (td) tr.appendChild(td);
                     });
                 }
@@ -3941,17 +4012,10 @@ function applySavedColumnConfigToTable(key) {
     }
 
     const currentThs = Array.from(headerRow.children);
-    if (Array.isArray(config.widths) && config.widths.length === currentThs.length) {
+    if (columnAlignmentActive[key] && Array.isArray(config.widths) && config.widths.length === currentThs.length) {
         currentThs.forEach((th, i) => {
             if (config.widths[i]) {
-                let w = parseInt(config.widths[i], 10);
-                if (th.textContent && th.textContent.includes('Műveletek') && (!Number.isFinite(w) || w < 135)) {
-                    w = 135;
-                }
-                th.style.width = w + 'px';
-                if (th.textContent && th.textContent.includes('Műveletek')) {
-                    th.style.minWidth = '135px';
-                }
+                th.style.width = config.widths[i] + 'px';
             }
         });
     }

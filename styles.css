@@ -431,6 +431,7 @@ body.dark-theme .page-ellipsis {
 }
 
 .custom-dropdown-menu {
+    display: none;
     position: absolute;
     top: calc(100% + 4px);
     left: 0;
